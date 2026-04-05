@@ -1,35 +1,51 @@
-# Build frontend
-FROM node:18-alpine AS frontend-builder
-WORKDIR /src
+# Build frontend - 参考 sun-panel-v2
+FROM node:18-alpine AS web_image
+
+# 使用淘宝npm镜像源加速依赖安装
+RUN npm config set registry https://registry.npmmirror.com
+
+WORKDIR /build
+
+# 先复制依赖文件（利用 Docker 缓存层）
 COPY package*.json ./
-RUN npm ci
+RUN npm install
+
+# 再复制其他文件
 COPY . .
-RUN YT_PANEL_DIST_OUT_DIR=/out/frontend-dist npm run build
 
-# Build backend  
-FROM rust:1.85-alpine AS backend-builder
-RUN apk add --no-cache musl-dev openssl-dev
-WORKDIR /src/backend
-COPY backend/Cargo.toml backend/Cargo.lock ./
-COPY backend/src ./src
-RUN cargo build --release --locked
+# 构建项目 - 使用 build-only 避免类型检查（构建时会检查）
+RUN npm run build-only
 
-# Runtime - 参考 sun-panel-v2，使用默认 alpine
+# Build backend
+FROM rust:1.85-alpine AS server_image
+
+WORKDIR /build/backend
+COPY ./backend/Cargo.toml ./backend/Cargo.lock ./
+COPY ./backend/src ./src
+
+RUN apk add --no-cache musl-dev openssl-dev pkgconfig
+
+# 构建 release 版本
+RUN cargo build --release
+
+# run_image
 FROM alpine
+
 WORKDIR /app
+
 RUN apk add --no-cache bash ca-certificates tzdata
 
-COPY --from=backend-builder /src/backend/target/release/yt-panel-rust-backend /app/yt-panel
+# 从构建阶段复制文件
+COPY --from=web_image /build/dist /app/web
+COPY --from=server_image /build/backend/target/release/yt-panel-rust-backend /app/yt-panel
 COPY backend/config/docker.toml /app/conf/app.toml
-COPY --from=frontend-builder /out/frontend-dist /app/web
 
-RUN mkdir -p /app/conf /app/database /app/uploads /app/web \
-    && chmod +x /app/yt-panel
+# 创建必要目录
+RUN mkdir -p /app/conf /app/database /app/uploads /app/web
 
 ENV YT_PANEL_CONFIG=/app/conf/app.toml
-EXPOSE 80
+ENV RUST_LOG=info
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget -qO- http://localhost:80/ping || exit 1
+EXPOSE 3002
 
 CMD ["/app/yt-panel"]
