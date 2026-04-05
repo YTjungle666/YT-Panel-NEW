@@ -4,8 +4,8 @@ FROM node:18-alpine AS web_image
 WORKDIR /build
 
 # 先复制依赖文件（利用 Docker 缓存层）
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
 # 再复制其他文件
 COPY . .

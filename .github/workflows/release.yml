@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
+
+      - name: Build Rust backend
+        working-directory: backend
+        run: cargo build --release
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-out
+          cp -r dist release-out/web
+          cp backend/target/release/yt-panel-rust-backend release-out/yt-panel
+          cp backend/config/docker.toml release-out/app.toml
+          tar -czf yt-panel-linux-amd64.tar.gz -C release-out .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: yt-panel-linux-amd64.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
