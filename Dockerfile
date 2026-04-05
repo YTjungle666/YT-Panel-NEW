@@ -1,12 +1,10 @@
 # Build frontend
 FROM node:18-alpine AS web_image
 
-RUN npm config set registry https://registry.npmmirror.com
-
 WORKDIR /build
 
 COPY package.json ./
-RUN npm install
+RUN npm install --force
 
 COPY . .
 RUN npm run build-only
@@ -22,19 +20,17 @@ COPY ./backend/src ./src
 RUN apk add --no-cache musl-dev openssl-dev pkgconfig
 RUN cargo build --release
 
-# run_image - 最新Alpine，同时支持Docker和LXC/CT
+# run_image
 FROM alpine:latest
 
 WORKDIR /app
 
 RUN apk add --no-cache bash ca-certificates tzdata
 
-# 从构建阶段复制文件
 COPY --from=web_image /build/dist /app/web
 COPY --from=server_image /build/backend/target/release/yt-panel-rust-backend /app/yt-panel
 COPY backend/config/docker.toml /app/conf/app.toml
 
-# 创建必要目录
 RUN mkdir -p /app/conf /app/database /app/uploads /app/web
 
 ENV YT_PANEL_CONFIG=/app/conf/app.toml
