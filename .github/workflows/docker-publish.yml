@@ -57,6 +57,12 @@ jobs:
         run: echo "name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
-        run: |
-          docker build -t ${{ steps.image.outputs.name }}:latest .
-          docker push ${{ steps.image.outputs.name }}:latest
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

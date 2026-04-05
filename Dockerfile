@@ -7,8 +7,8 @@ RUN apk add --no-cache bash ca-certificates tzdata
 
 # 从构建产物复制文件
 COPY dist /app/web
-COPY backend/target/release/yt-panel-rust-backend /app/yt-panel
-COPY backend/config/docker.toml /app/conf/app.toml
+COPY yt-panel-rust-backend /app/yt-panel
+COPY docker.toml /app/conf/app.toml
 
 # 创建必要目录
 RUN mkdir -p /app/conf /app/database /app/uploads /app/web
