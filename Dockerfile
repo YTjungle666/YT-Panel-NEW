@@ -20,6 +20,7 @@ RUN npm run build-only
 FROM rust:1.85-alpine AS server_image
 
 WORKDIR /build/backend
+
 COPY ./backend/Cargo.toml ./backend/Cargo.lock ./
 COPY ./backend/src ./src
 
