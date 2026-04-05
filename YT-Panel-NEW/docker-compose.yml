@@ -1,0 +1,12 @@
+services:
+  yt-panel-new:
+    image: ghcr.io/ytjungle666/yt-panel-new:latest
+    container_name: yt-panel-new
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker-data/database:/app/database
+      - ./docker-data/uploads:/app/uploads
+    # 如需自定义配置，可取消下面一行注释并提供本地 app.toml
+    # - ./docker-data/config/app.toml:/app/conf/app.toml:ro

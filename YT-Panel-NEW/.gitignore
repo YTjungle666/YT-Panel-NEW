@@ -1,0 +1,22 @@
+# Frontend
+node_modules/
+dist/
+frontend-dist/
+src/node_modules/
+src/dist/
+
+# Rust
+backend/target/
+**/*.rs.bk
+
+# Runtime data
+runtime/
+uploads/
+database/
+*.db
+*.db-shm
+*.db-wal
+
+# Env / local config
+.env
+backend/config/app.toml
