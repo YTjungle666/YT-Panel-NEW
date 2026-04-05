@@ -1,9 +1,6 @@
 # Build frontend
 FROM node:18-alpine AS web_image
 
-# 使用淘宝npm镜像源加速依赖安装
-RUN npm config set registry https://registry.npmmirror.com
-
 WORKDIR /build
 
 # 先复制依赖文件（利用 Docker 缓存层）
