@@ -4,8 +4,10 @@ FROM node:18-alpine AS web_image
 WORKDIR /build
 
 # 先复制依赖文件（利用 Docker 缓存层）
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+
+# 安装依赖，跳过平台检查（rollup有gnu和musl版本，强制安装）
+RUN npm ci --force || npm install --force
 
 # 再复制其他文件
 COPY . .
