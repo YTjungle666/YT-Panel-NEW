@@ -1,4 +1,4 @@
-# Build frontend - 参考 sun-panel-v2
+# Build frontend
 FROM node:18-alpine AS web_image
 
 # 使用淘宝npm镜像源加速依赖安装
@@ -7,13 +7,13 @@ RUN npm config set registry https://registry.npmmirror.com
 WORKDIR /build
 
 # 先复制依赖文件（利用 Docker 缓存层）
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # 再复制其他文件
 COPY . .
 
-# 构建项目 - 使用 build-only 避免类型检查（构建时会检查）
+# 构建项目 - 使用 build-only 避免类型检查
 RUN npm run build-only
 
 # Build backend
