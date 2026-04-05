@@ -47,7 +47,7 @@ jobs:
           mkdir -p docker-build
           cp -r dist docker-build/
           cp backend/target/release/yt-panel-rust-backend docker-build/
-          cp -r backend/config docker-build/
+          cp backend/config/docker.toml docker-build/
           cp Dockerfile docker-build/
 
       - name: Set up Docker Buildx
