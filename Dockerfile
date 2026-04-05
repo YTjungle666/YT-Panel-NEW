@@ -1,18 +1,21 @@
 # Build frontend
 FROM node:18-alpine AS web_image
 
+# 先安装必要的系统依赖
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /build
 
 # 先复制依赖文件（利用 Docker 缓存层）
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-# 安装依赖，跳过平台检查（rollup有gnu和musl版本，强制安装）
-RUN npm ci --force || npm install --force
+# 使用npm install动态安装依赖，避免lock文件中的平台特定包
+RUN npm install --legacy-peer-deps
 
 # 再复制其他文件
 COPY . .
 
-# 构建项目 - 使用 build-only 避免类型检查
+# 构建项目
 RUN npm run build-only
 
 # Build backend
