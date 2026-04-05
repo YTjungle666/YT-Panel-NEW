@@ -13,7 +13,6 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   build:
@@ -31,7 +30,7 @@ jobs:
         run: npm ci
 
       - name: Build frontend
-        run: npm run build
+        run: npm run build-only
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
