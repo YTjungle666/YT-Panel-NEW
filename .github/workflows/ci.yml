@@ -1,5 +1,4 @@
 name: ci
-
 on:
   push:
     branches:
@@ -56,7 +55,8 @@ jobs:
           cp -r dist release-out/web
           cp backend/target/release/yt-panel-rust-backend release-out/yt-panel
           cp backend/config/docker.toml release-out/app.toml
-          tar -czf release-out/yt-panel-linux-amd64.tar.gz -C release-out .
+          tar -czf yt-panel-linux-amd64.tar.gz -C release-out .
+          mv yt-panel-linux-amd64.tar.gz release-out/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
