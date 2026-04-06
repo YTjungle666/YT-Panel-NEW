@@ -2,12 +2,11 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
-  workflow_dispatch:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
@@ -22,15 +21,24 @@ jobs:
           node-version: '18'
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build frontend
-        run: npm run build
+        run: npm run build-only
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.85.1
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Build Rust backend
         working-directory: backend
@@ -48,6 +56,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: yt-panel-linux-amd64.tar.gz
-          generate_release_notes: true
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes
+            - CI fixes for npm install
+            - Build artifacts for Linux AMD64
+            
+            ## Docker
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:latest
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
