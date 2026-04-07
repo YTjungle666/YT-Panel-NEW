@@ -5,7 +5,7 @@
 YT-Panel-NEW 是一款专为家庭服务器、NAS 和个人云设计的书签管理面板。采用 Rust 重写后端，提供更高的性能和安全性，同时保持与原有前端的无缝兼容。
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/YTjungle666/YT-Panel-NEW/docker-publish.yml)
-![License](https://img.shields.io/github/license/YTjungle666/YT-Panel-NEW)
+![License](https://img.shields.io/badge/license-PolyForm--Noncommercial--1.0.0-orange)
 
 ---
 
@@ -207,7 +207,7 @@ docker build -t yt-panel:alpine .
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+PolyForm Noncommercial License 1.0.0 - 禁止商业用途，详见 [LICENSE](LICENSE) 文件
 
 ---
 

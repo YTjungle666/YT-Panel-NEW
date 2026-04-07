@@ -2,6 +2,7 @@
   "name": "yt-panel-new-web",
   "version": "0.0.0",
   "private": false,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Frontend for YT-Panel-NEW, a hardened Rust-first self-hosted server and NAS dashboard",
   "author": "YT-Panel Team",
   "keywords": [

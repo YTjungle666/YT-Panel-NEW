@@ -3,7 +3,7 @@ name = "yt-panel-rust-backend"
 version = "0.1.0"
 edition = "2021"
 description = "Rust backend for YT-Panel-NEW, a hardened self-hosted server and NAS dashboard"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/YTjungle666/YT-Panel-NEW"
 homepage = "https://github.com/YTjungle666/YT-Panel-NEW"
 
