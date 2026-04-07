@@ -13,6 +13,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: '20'
+  RUST_VERSION: '1.85.1'
+  RUST_TARGET: 'x86_64-unknown-linux-musl'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,21 +25,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 18
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Audit frontend dependencies
+        run: npm audit --omit=dev
+
+      - name: Type-check frontend
+        run: npm run type-check
 
       - name: Build frontend
         run: npm run build-only
 
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ env.RUST_TARGET }}
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -47,15 +63,24 @@ jobs:
 
       - name: Build Rust backend
         working-directory: backend
-        run: cargo build --release
+        run: cargo build --release --target ${{ env.RUST_TARGET }}
+
+      - name: Build Docker image
+        run: docker build -t yt-panel-ci:test .
+
+      - name: Install zstd
+        run: sudo apt-get install -y zstd
+
+      - name: Export PVE CT template
+        run: ./scripts/export-pve-template.sh yt-panel-ci:test release-out/yt-panel-alpine-ct-template.tar.zst
 
       - name: Prepare release files
         run: |
-          mkdir -p release-out
-          cp -r dist release-out/web
-          cp backend/target/release/yt-panel-rust-backend release-out/yt-panel
-          cp backend/config/docker.toml release-out/app.toml
-          tar -czf yt-panel-linux-amd64.tar.gz -C release-out .
+          mkdir -p release-out/yt-panel-linux-amd64/conf release-out/yt-panel-linux-amd64/web
+          cp backend/target/${{ env.RUST_TARGET }}/release/yt-panel-rust-backend release-out/yt-panel-linux-amd64/yt-panel
+          cp -r dist/. release-out/yt-panel-linux-amd64/web/
+          cp backend/config/docker.toml release-out/yt-panel-linux-amd64/conf/app.toml
+          tar -czf yt-panel-linux-amd64.tar.gz -C release-out yt-panel-linux-amd64
           mv yt-panel-linux-amd64.tar.gz release-out/
 
       - name: Upload artifact

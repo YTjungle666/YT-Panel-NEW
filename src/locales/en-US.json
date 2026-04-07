@@ -150,7 +150,11 @@
       "connectionSuccess": "Connection OK",
       "connectionFailed": "Connection Failed",
       "testing": "Testing...",
-      "pleaseEnterUrl": "Please enter URL"
+      "pleaseEnterUrl": "Please enter URL",
+      "passwordSecurity": "Password Security",
+      "passwordSecurityHint": "Manage first-login password changes and weak-password policy. When weak passwords are disabled, all password entry points must use strong passwords.",
+      "allowWeakPassword": "Allow weak passwords",
+      "allowWeakPasswordHint": "Only enable this for legacy compatibility. It should stay off by default."
     },
     "itemGroupManage": {
       "appName": "Group Management",
@@ -316,7 +320,6 @@
     "loginButton": "Login",
     "passwordPlaceholder": "Password",
     "registerButton": "Register",
-    "resetPasswordButton": "Forgot password",
     "usernamePlaceholder": "Username",
     "welcomeMessage": "Welcome back!"
   },
@@ -349,29 +352,9 @@
     "logoutSuccess": "You have safely logged out. Looking forward to seeing you again!",
     "newPassword": "New password",
     "oldPassword": "Old password",
-    "updatePassword": "Change password"
-  },
-  "resetPassword": {
-    "title": "Reset password",
-    "description": "Keep the legacy entry point, but do not fake a working email reset flow.",
-    "emailPlaceholder": "Email",
-    "emailCodePlaceholder": "Email verification code",
-    "newPasswordPlaceholder": "New password",
-    "confirmPasswordPlaceholder": "Confirm new password",
-    "sendCode": "Send code",
-    "submit": "Reset password",
-    "backToLogin": "Back to login",
-    "statusNotice": "Legacy YT-Panel only kept the frontend API declarations and mail helper functions for forgot-password, but never wired the routes. Rust keeps the entry and contract visible without pretending the mail flow works.",
-    "contactAdmin": "This instance does not have password reset email configured yet. Please contact the administrator or use the in-session change-password flow.",
-    "sendCodeFailed": "Failed to send verification code",
-    "resetFailed": "Failed to reset password",
-    "resetSuccess": "Password reset succeeded. Please log in.",
-    "emailRequired": "Please enter your email",
-    "emailInvalid": "Please enter a valid email address",
-    "codeRequired": "Please enter the email verification code",
-    "passwordRequired": "Please enter a new password",
-    "passwordLimit": "Password length must be between 6 and 64 characters",
-    "confirmPasswordRequired": "Please confirm the new password",
-    "confirmPasswordMismatch": "The two passwords do not match"
+    "updatePassword": "Change password",
+    "passwordLimit": "Password length must be between 8 and 64 characters",
+    "forceChangePasswordNotice": "This account is still using the initial password. Please change it to a strong password before continuing.",
+    "passwordUpdatedRelogin": "Password updated successfully. Please log in again."
   }
 }

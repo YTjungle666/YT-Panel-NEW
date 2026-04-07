@@ -285,7 +285,7 @@
 
 <script setup lang="ts">
 
-import { ref, computed, onMounted, onUnmounted, h, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h, watch } from 'vue'
 // 不再直接导入SVG文件，使用内联方式
 import { NTree, NInput, useMessage, NTreeSelect } from 'naive-ui'
 import { useRouter } from 'vue-router'
@@ -293,7 +293,7 @@ import { getList as getBookmarksList, add as addBookmark, update, deletes, addMu
 import { getSiteFavicon } from '@/api/panel/itemIcon'
 import { t } from '@/locales'
 import { dialog } from '@/utils/request/apiMessage'
-import { parseBrowserBookmarkHTML, flattenBookmarkTree } from '@/utils/bookmarkImportExport'
+import { exportBookmarkJson, parseBrowserBookmarkHTML, flattenBookmarkTree, type BookmarkTreeNode } from '@/utils/bookmarkImportExport'
 import { ss } from '@/utils/storage/local'
 import { openUrlWithoutReferer } from '@/utils/cmn'
 import { DEFAULT_BOOKMARK_ICON, getBookmarkIconSrc } from '@/utils/bookmarkIcon'
@@ -386,6 +386,68 @@ async function refreshBookmarkIconInBackground(bookmark: Bookmark, force = false
 	}
 }
 
+function applyTreeData(treeDataResult: any[]) {
+	fullData.value = treeDataResult
+	const folderTreeData = filterFoldersOnly(treeDataResult)
+	if (Array.isArray(folderTreeData) && folderTreeData.length > 0) {
+		bookmarkTree.value = folderTreeData.map(node => structuredClone(node))
+		defaultExpandedKeys.value = folderTreeData[0]?.key ? [folderTreeData[0].key] : []
+	} else {
+		bookmarkTree.value = []
+		defaultExpandedKeys.value = []
+	}
+	if (selectedFolder.value === '0' || !selectedFolder.value)
+		initializeSortedItems()
+	if (globalThis) {
+		Object.defineProperty(globalThis, '__bookmarksFullData', { value: treeDataResult, configurable: true })
+	}
+}
+
+function filterFoldersOnly(nodes: TreeOption[]): TreeOption[] {
+	return nodes
+		.filter(node => node.isFolder)
+		.map((node) => {
+			const children = filterFoldersOnly(node.children || [])
+			return {
+				...node,
+				children,
+				isLeaf: children.length === 0,
+				disabledExpand: children.length === 0,
+			}
+		})
+}
+
+function toExportBookmarkTree(nodes: TreeOption[]): BookmarkTreeNode[] {
+	return nodes.map((node) => {
+		if (node.isFolder) {
+			return {
+				id: Number(node.key),
+				title: node.label,
+				isFolder: true,
+				children: toExportBookmarkTree(node.children || []),
+			}
+		}
+
+		return {
+			id: Number(node.bookmark?.id || node.key),
+			title: node.bookmark?.title || node.label,
+			url: node.bookmark?.url || '',
+			icon: node.bookmark?.iconJson || undefined,
+			isFolder: false,
+		}
+	})
+}
+
+function exportBookmarks() {
+	const sourceTree = fullData.value.length > 0 ? fullData.value : []
+	if (sourceTree.length === 0) {
+		ms.warning(t('bookmarkManager.noData'))
+		return
+	}
+
+	exportBookmarkJson().addBookmarksData(toExportBookmarkTree(sourceTree)).exportFile()
+}
+
 async function refreshVisibleBookmarkIcons() {
 	for (const item of filteredBookmarks.value.slice(0, 30)) {
 		if (!item.isFolder && item.url && !item.iconJson) {
@@ -422,45 +484,20 @@ function togglePanel() {
 }
 
 function collapsePanel() {
+  if (!isPanelExpanded.value) return
 	isPanelExpanded.value = false
 	setTimeout(() => {
 		showLeftPanel.value = false
 	}, 300) // 等待动画完成再隐藏
 }
 
-// 组件挂载时加载书签数据
-onMounted(() => {
-	// 延迟执行，优先保证页面切换流畅
-	setTimeout(() => {
-		refreshBookmarks();
-	}, 20);
-
-	// 添加全局事件监听器
-	document.addEventListener('mousemove', handleMouseMove);
-	document.addEventListener('mouseup', stopResize);
-	document.addEventListener('click', handleGlobalClick);
-	// 全局处理dragover，防止出现禁用光标 (使用捕获阶段，确保优先执行)
-	document.addEventListener('dragover', handleGlobalDragOver, true);
-	document.addEventListener('dragenter', handleGlobalDragOver, true);
-
-	handleResize();
-	window.addEventListener('resize', handleResize);
-});
-
-onUnmounted(() => {
-	document.removeEventListener('mousemove', handleMouseMove);
-	document.removeEventListener('mouseup', stopResize);
-	document.removeEventListener('click', handleGlobalClick);
-	document.removeEventListener('dragover', handleGlobalDragOver, true);
-	document.removeEventListener('dragenter', handleGlobalDragOver, true);
-	window.removeEventListener('resize', handleResize);
-});
+const isBookmarkPageInitialized = ref(false)
 
 // 全局dragover/dragenter处理
 function handleGlobalDragOver(e: DragEvent) {
-	e.preventDefault();
+	e.preventDefault()
 	if (e.dataTransfer) {
-		e.dataTransfer.dropEffect = 'move';
+		e.dataTransfer.dropEffect = 'move'
 	}
 }
 
@@ -1205,18 +1242,9 @@ function handleDragLeave(event: DragEvent) {
 const sortedItems = ref<any[]>([]);
 
 // 监听filteredBookmarks变化，自动更新sortedItems
-watch(() => filteredBookmarks.value, (newValue) => {
-  // 直接使用过滤后的数据，不做额外排序
-  sortedItems.value = [...newValue];
-}, { immediate: true, deep: true });
-
-// 在组件挂载时，确保立即执行一次过滤和排序
-watch(fullData, () => {
-  // 强制使用根目录过滤后的数据
-  setTimeout(() => {
-    sortedItems.value = [...filteredBookmarks.value];
-  }, 0);
-}, { immediate: true, deep: true });
+watch(filteredBookmarks, (newValue) => {
+  sortedItems.value = [...newValue]
+}, { immediate: true })
 
 // 监听selectedFolder变化,同步左侧树的展开状态和选中状态
 watch(selectedFolder, (newFolderId) => {
@@ -1977,290 +2005,82 @@ async function importBookmarksToServerWithHTML(htmlContent: string) {
 
 		if (response.code === 0) {
 			ss.remove(BOOKMARKS_CACHE_KEY)
-			// 刷新书签列表
-			await refreshBookmarks();
-			ms.success(t('bookmarkManager.importSuccess', { count: bookmarkList.length }));
+			await refreshBookmarks(true)
+			ms.success(t('bookmarkManager.importSuccess', { count: bookmarkList.length }))
 		} else {
-			ms.error(`${t('common.failed')}: ${response.msg}`);
+			ms.error(response.msg || t('bookmarkManager.unknownError'))
 		}
 	} catch (error) {
-		ms.error(`${t('common.failed')}: ${(error as Error).message || t('common.unknownError')}`);
+		ms.error((error as Error).message || t('bookmarkManager.unknownError'))
 	} finally {
-		uploadLoading.value = false;
+		uploadLoading.value = false
 	}
-}
-
-// 导出书签为HTML格式
-function exportBookmarks() {
-	// 准备HTML文件头
-	let html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
-`;
-	html += `<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-`;
-	html += `<TITLE>Bookmarks</TITLE>
-`;
-	html += `<H1>Bookmarks</H1>
-`;
-	html += `<DL><p>
-`;
-
-	// 转换书签树为HTML
-	function convertTreeToHtml(nodes: TreeOption[], level: number = 0): string {
-		let result = ``;
-
-		for (const node of nodes) {
-			if (node.isFolder) {
-				// 创建文件夹
-				result += `${'  '.repeat(level)}<DT><H3>${node.label}</H3>
-`;
-				result += `${'  '.repeat(level)}<DL><p>
-`;
-				// 递归处理子节点
-				result += convertTreeToHtml(node.children, level + 1);
-				result += `${'  '.repeat(level)}</DL><p>
-`;
-			} else if (node.bookmark) {
-				// 创建书签
-			const title = node.bookmark.title || '';
-			const url = node.bookmark.url || '';
-			const icon = node.bookmark.iconJson || node.rawNode?.iconJson || node.rawNode?.icon || '';
-			result += `${'  '.repeat(level)}<DT><A HREF="${url}" ${icon ? `ICON="${icon}"` : ''}>${title}</A>
-`;
-			}
-		}
-
-		return result;
-	}
-
-	// 转换所有节点
-	html += convertTreeToHtml(fullData.value.length > 0 ? fullData.value : bookmarkTree.value);
-
-	// 关闭根DL标签
-	html += `</DL><p>
-`;
-
-	// 下载文件
-	const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = 'bookmarks.html';
-	document.body.appendChild(a);
-	a.click();
-	document.body.removeChild(a);
-	URL.revokeObjectURL(url);
-}
-
-// 不再需要此函数，后端已直接处理排序值
-
-
-// 过滤函数：从完整树结构中只保留文件夹
-function filterFoldersOnly(nodes: TreeOption[]): TreeOption[] {
-
-	if (!Array.isArray(nodes)) {
-		console.error('filterFoldersOnly: 输入数据不是数组:', nodes);
-		return [];
-	}
-
-	const result: TreeOption[] = [];
-	for (const node of nodes) {
-		if (node && node.isFolder) {
-			const folderNode: TreeOption = {
-				...node,
-				bookmark: undefined,
-				children: []
-			};
-
-			if (Array.isArray(node.children) && node.children.length > 0) {
-				const folderChildren = node.children.filter(child => child && child.isFolder);
-				if (folderChildren.length > 0) {
-					folderNode.children = filterFoldersOnly(folderChildren);
-					// 子节点不为空 → 启用折叠，设置isLeaf为false
-					folderNode.isLeaf = false;
-					folderNode.disabledExpand = false;
-				} else {
-					folderNode.children = [];
-					// 子节点为空 → 禁用折叠，设置isLeaf为true
-					folderNode.isLeaf = true;
-					folderNode.disabledExpand = true;
-				}
-			} else {
-				// 没有子节点 → 设置isLeaf为true
-				folderNode.isLeaf = true;
-				folderNode.disabledExpand = true;
-			}
-
-			result.push(folderNode);
-		}
-	}
-
-	return result;
 }
 
 // 刷新书签列表
-	async function refreshBookmarks(forceRefresh = false) {
+async function refreshBookmarks(forceRefresh = false) {
 	try {
-		// 首先尝试从BOOKMARKS_CACHE_KEY获取完整数据（与首页缓存一致）
-	let folderTreeData: TreeOption[] = [];
+		if (forceRefresh)
+			ss.remove(BOOKMARKS_CACHE_KEY)
 
-		// 强制刷新时清除缓存（与首页保持一致）
-		if (forceRefresh) {
-			ss.remove(BOOKMARKS_CACHE_KEY);
-		}
-
-		// 检查缓存是否存在
 		if (!forceRefresh) {
-			const cachedData = ss.get(BOOKMARKS_CACHE_KEY);
+			const cachedData = ss.get(BOOKMARKS_CACHE_KEY)
 			if (cachedData) {
-				// 与首页保持一致的处理逻辑
-				let treeDataResult: TreeOption[] = [];
-				const data = cachedData;
+				const data = cachedData
+				let treeDataResult: TreeOption[] = []
 
 				if (Array.isArray(data) && data.length > 0 && 'children' in data[0]) {
-					// 已经是树形结构，转换为前端需要的格式
-					treeDataResult = convertServerTreeToFrontendTree(data);
+					treeDataResult = convertServerTreeToFrontendTree(data)
 				} else if ((data as { list?: any[] }).list && Array.isArray((data as { list?: any[] }).list)) {
-					// 后端返回的是带list字段的结构
-					const serverBookmarks = (data as { list: any[] }).list;
-					if (serverBookmarks.length > 0 && 'children' in serverBookmarks[0]) {
-						// list字段中已经是树形结构
-						treeDataResult = convertServerTreeToFrontendTree(serverBookmarks);
-					} else {
-						// 构建树形结构
-						treeDataResult = buildBookmarkTree(serverBookmarks);
-					}
+					const serverBookmarks = (data as { list: any[] }).list
+					treeDataResult = serverBookmarks.length > 0 && 'children' in serverBookmarks[0]
+						? convertServerTreeToFrontendTree(serverBookmarks)
+						: buildBookmarkTree(serverBookmarks)
 				} else {
-					// 作为列表数据构建树形结构
-					treeDataResult = buildBookmarkTree(Array.isArray(data) ? data : []);
+					treeDataResult = buildBookmarkTree(Array.isArray(data) ? data : [])
 				}
 
-				// 先更新完整数据（树结构）
-			fullData.value = treeDataResult;
-			// 保存原始数据缓存
-			rawDataCache.value = cachedData;
-
-			// 过滤文件夹
-				folderTreeData = filterFoldersOnly(treeDataResult);
-
-				// 严格检查过滤结果
-if (Array.isArray(folderTreeData) && folderTreeData.length > 0) {
-				// 深拷贝避免引用问题
-				bookmarkTree.value = JSON.parse(JSON.stringify(folderTreeData));
-
-				// 默认展开第一栏文件夹
-				if (folderTreeData.length > 0 && folderTreeData[0].key) {
-					defaultExpandedKeys.value = [folderTreeData[0].key];
-				} else {
-					defaultExpandedKeys.value = [];
-				}
-
-				// 保留全局变量更新
-				if (globalThis) {
-					Object.defineProperty(globalThis, '__bookmarksFullData', { value: treeDataResult, configurable: true });
-				}
-
-				return;
-			} else {
-				// 设置空数组确保组件能正确渲染
-				bookmarkTree.value = [];
-				defaultExpandedKeys.value = [];
-				// 如果缓存数据有内容，返回以避免请求服务器
-				if (Array.isArray(treeDataResult) && treeDataResult.length > 0) {
-					return;
-				}
+				applyTreeData(treeDataResult)
+				rawDataCache.value = cachedData
+				if (Array.isArray(treeDataResult) && treeDataResult.length > 0)
+					return
 			}
-			}
-
 		}
 
-		// 缓存不存在或强制刷新时从服务器获取数据
-
-const response = await getBookmarksList();
-if (response.code === 0) {
-	// 后端返回格式为 { data: { list: [], count: number }, code: 0, msg: "" }
-	// 获取实际的书签数据列表
-	let serverBookmarks = [];
-
-	// 检查响应结构
-	if (response.data) {
-		// 如果data本身是数组，直接使用
-		if (Array.isArray(response.data)) {
-			serverBookmarks = response.data;
-		}
-		// 如果data是包含list字段的对象，使用list字段
-				else if (Array.isArray((response.data as any).list)) {
-					serverBookmarks = (response.data as any).list;
-				}
-	}
-
-	let treeDataResult = [];
-
-	// 检查是否已经是树形结构（直接包含children字段）
-	if (serverBookmarks.length > 0 && 'children' in serverBookmarks[0]) {
-		// 已经是树形结构，转换为前端需要的格式
-
-		treeDataResult = convertServerTreeToFrontendTree(serverBookmarks);
-	} else {
-		// 构建树形结构
-
-		treeDataResult = buildBookmarkTree(serverBookmarks);
-	}
-
-	// 存储到缓存（与首页保持一致，缓存原始服务器数据）
-	// 缓存response.data，确保包含完整的服务器响应数据
-	ss.set(BOOKMARKS_CACHE_KEY, response.data);
-
-	// 更新完整数据（树结构）
-	fullData.value = treeDataResult;
-
-	// 过滤文件夹
-	const folderTreeData = filterFoldersOnly(treeDataResult);
-
-			// 检查过滤结果
-			if (Array.isArray(folderTreeData) && folderTreeData.length > 0) {
-				// 深拷贝避免引用问题
-				bookmarkTree.value = JSON.parse(JSON.stringify(folderTreeData));
-
-				// 默认展开第一栏文件夹
-				if (folderTreeData.length > 0 && folderTreeData[0].key) {
-					defaultExpandedKeys.value = [folderTreeData[0].key];
-				} else {
-					defaultExpandedKeys.value = [];
-				}
-
-				// 保留全局变量更新
-				if (globalThis) {
-					Object.defineProperty(globalThis, '__bookmarksFullData', { value: treeDataResult, configurable: true });
-				}
-			} else {
-				// 设置空数组确保组件能正确渲染
-				bookmarkTree.value = [];
-				sortedItems.value = [];
-				defaultExpandedKeys.value = [];
+		const response = await getBookmarksList()
+		if (response.code === 0) {
+			let serverBookmarks: any[] = []
+			if (response.data) {
+				if (Array.isArray(response.data))
+					serverBookmarks = response.data
+				else if (Array.isArray((response.data as any).list))
+					serverBookmarks = (response.data as any).list
 			}
+
+			const treeDataResult = serverBookmarks.length > 0 && 'children' in serverBookmarks[0]
+				? convertServerTreeToFrontendTree(serverBookmarks)
+				: buildBookmarkTree(serverBookmarks)
+
+			ss.set(BOOKMARKS_CACHE_KEY, response.data)
+			applyTreeData(treeDataResult)
 		} else {
-			// 服务器返回错误
-			console.error('获取书签数据失败:', response);
-			// 设置空数据确保组件能正确渲染
-			fullData.value = [];
-			bookmarkTree.value = [];
-			sortedItems.value = [];
-			defaultExpandedKeys.value = [];
-
-			// 全局变量更新为空
+			console.error('获取书签数据失败:', response)
+			fullData.value = []
+			bookmarkTree.value = []
+			sortedItems.value = []
+			defaultExpandedKeys.value = []
 			if (globalThis) {
-				Object.defineProperty(globalThis, '__bookmarksFullData', { value: [], configurable: true });
+				Object.defineProperty(globalThis, '__bookmarksFullData', { value: [], configurable: true })
 			}
 		}
 	} catch (error) {
-		console.error('刷新书签列表发生异常:', error);
-		// 清空所有相关数据
-		bookmarkTree.value = [];
-		fullData.value = [];
-		sortedItems.value = [];
-		defaultExpandedKeys.value = [];
+		console.error('刷新书签列表发生异常:', error)
+		bookmarkTree.value = []
+		fullData.value = []
+		sortedItems.value = []
+		defaultExpandedKeys.value = []
 	}
- }
+}
 
 // 将服务器返回的树形结构或首页缓存的TreeOption数据转换为前端组件需要的格式
 function convertServerTreeToFrontendTree(serverTree: any[]): TreeOption[] {
@@ -2779,58 +2599,38 @@ const handleResize = () => {
 	// 移动端默认隐藏左栏
 	showLeftPanel.value = isMobile.value ? false : true
 }
-// 组件挂载时加载书签
+const initializeSortedItems = () => {
+	const rootItems = allItems.value.filter(item => String(item.folderId || '0') === '0')
+	sortedItems.value = [...rootItems]
+}
+
 onMounted(async () => {
-	// 首先设置selectedFolder为'0'
+	if (isBookmarkPageInitialized.value)
+		return
+	isBookmarkPageInitialized.value = true
 	selectedFolder.value = '0'
-
-	// 加载数据
-	await refreshBookmarks();
-
-	// 完全绕过计算属性和watch，直接操作sortedItems
-	// 使用较长的延迟确保数据完全处理
-	setTimeout(() => {
-
-
-		// 移除未使用的调试代码
-
-		// 严格过滤根目录项目
-		const rootItems = allItems.value.filter(item => {
-			const folderId = String(item.folderId || '0');
-			return folderId === '0';
-		});
-
-
-		// 清空并重新设置sortedItems
-		sortedItems.value = [];
-		nextTick(() => {
-			sortedItems.value = [...rootItems];
-		});
-	}, 500);
-
-	// 添加全局事件监听器
-	document.addEventListener('mousemove', handleMouseMove);
-	document.addEventListener('mouseup', stopResize);
-	document.addEventListener('click', handleGlobalClick);
-
+	await refreshBookmarks()
+	initializeSortedItems()
+	document.addEventListener('mousemove', handleMouseMove)
+	document.addEventListener('mouseup', stopResize)
+	document.addEventListener('click', handleGlobalClick)
+	document.addEventListener('dragover', handleGlobalDragOver, true)
+	document.addEventListener('dragenter', handleGlobalDragOver, true)
 	handleResize()
 	window.addEventListener('resize', handleResize)
-});
+})
 
 onUnmounted(() => {
-	document.removeEventListener('mousemove', handleMouseMove);
-	document.removeEventListener('mouseup', stopResize);
-	document.removeEventListener('click', handleGlobalClick);
-
+	document.removeEventListener('mousemove', handleMouseMove)
+	document.removeEventListener('mouseup', stopResize)
+	document.removeEventListener('click', handleGlobalClick)
+	document.removeEventListener('dragover', handleGlobalDragOver, true)
+	document.removeEventListener('dragenter', handleGlobalDragOver, true)
 	window.removeEventListener('resize', handleResize)
-	// 清理全局存储的完整数据，避免内存泄漏
 	if ((globalThis as any).__bookmarksFullData) {
-		delete (globalThis as any).__bookmarksFullData;
+		delete (globalThis as any).__bookmarksFullData
 	}
-});
-
-
-
+})
 </script>
 
 <style scoped>

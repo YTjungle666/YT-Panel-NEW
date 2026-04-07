@@ -3,53 +3,62 @@
 ## Docker 部署
 
 ```bash
-# 构建镜像
-docker build -t yt-panel .
+# 先构建前端和 musl 后端产物
+npm ci
+npm run build-only
+(cd backend && cargo build --release --target x86_64-unknown-linux-musl)
+
+# 再打 Alpine 运行镜像
+docker build -t yt-panel:alpine .
 
 # 运行
-docker run -d -p 3000:3000 -p 3001:3001 \
-  -v $(pwd)/data:/app/data \
+docker run -d -p 80:80 \
+  -v $(pwd)/data/database:/app/database \
+  -v $(pwd)/data/uploads:/app/uploads \
   --name yt-panel \
-  yt-panel
+  yt-panel:alpine
 ```
 
 ## PVE LXC 容器部署
 
 ```bash
-# 在 PVE 宿主机上执行
-pct create 100 /var/lib/vz/template/cache/debian-12-standard.tar.zst \
-  --ostype debian \
+# 在任意 Docker 主机上导出与 Docker 同源的 Alpine CT 模板
+npm ci
+npm run build-only
+(cd backend && cargo build --release --target x86_64-unknown-linux-musl)
+docker build -t yt-panel:alpine .
+./scripts/export-pve-template.sh yt-panel:alpine ./artifacts/YT-Panel-NEW/release/yt-panel-alpine-ct-template.tar.zst
+
+# 复制到 PVE 宿主机
+scp ./artifacts/YT-Panel-NEW/release/yt-panel-alpine-ct-template.tar.zst \
+  root@pve:/var/lib/vz/template/cache/
+
+# 在 PVE 宿主机上创建 CT，无需再进入容器补环境
+pct create 100 local:vztmpl/yt-panel-alpine-ct-template.tar.zst \
+  --ostype alpine \
+  --entrypoint /app/ct-entrypoint.sh \
   --hostname yt-panel \
   --memory 1024 \
   --cores 2 \
-  --net0 name=eth0,bridge=vmbr0,ip=dhcp
+  --rootfs local-lvm:4 \
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+  --unprivileged 1 \
+  --start 1
 
-pct start 100
-pct exec 100 -- bash -c "
-  apt update && apt install -y curl git
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt install -y nodejs cargo
-"
-
-# 复制项目到容器
-pct push 100 ./yt-panel-new /opt/yt-panel/
-
-pct exec 100 -- bash -c "
-  cd /opt/yt-panel
-  ./build.sh
-  ./start.sh
-"
+# 验证
+pct exec 100 -- wget -qO- http://127.0.0.1/ping
 ```
 
 ## 升级
 
 ```bash
 # 保留数据，只更新代码
-docker pull yt-panel:latest
+docker pull ghcr.io/ytjungle666/yt-panel-new:latest
 docker stop yt-panel
 docker rm yt-panel
-docker run -d -p 3000:3000 -p 3001:3001 \
-  -v $(pwd)/data:/app/data \
+docker run -d -p 80:80 \
+  -v $(pwd)/data/database:/app/database \
+  -v $(pwd)/data/uploads:/app/uploads \
   --name yt-panel \
-  yt-panel:latest
+  ghcr.io/ytjungle666/yt-panel-new:latest
 ```

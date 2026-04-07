@@ -1,18 +1,16 @@
 use axum::{
-    http::StatusCode,
+    http::{header::SET_COOKIE, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde::Serialize;
+use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct ApiError {
     pub code: i32,
     pub msg: String,
 }
-
-pub type ApiResult = Result<Response, ApiError>;
 
 impl ApiError {
     pub fn new(code: i32, msg: impl Into<String>) -> Self {
@@ -26,16 +24,23 @@ impl ApiError {
         Self::new(1400, msg)
     }
 
-    pub fn unauthorized(msg: impl Into<String>) -> Self {
-        Self::new(1001, msg)
+    #[allow(dead_code)]
+    pub fn unauthorized() -> Self {
+        Self::new(1100, "Unauthorized")
+    }
+
+    #[allow(dead_code)]
+    pub fn forbidden() -> Self {
+        Self::new(1103, "Forbidden")
+    }
+
+    #[allow(dead_code)]
+    pub fn not_found() -> Self {
+        Self::new(1104, "Not Found")
     }
 
     pub fn db(err: impl Into<String>) -> Self {
         Self::new(1200, format!("Database error[{}]", err.into()))
-    }
-
-    pub fn not_found() -> Self {
-        Self::new(1404, "Resource not found")
     }
 
     pub fn internal(msg: impl Into<String>) -> Self {
@@ -45,16 +50,16 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let envelope = ApiEnvelope {
+        let envelope = ApiEnvelope::<Value> {
             code: self.code,
             msg: self.msg,
-            data: None::<Value>,
+            data: None,
         };
-        Json(envelope).into_response()
+        (StatusCode::OK, Json(envelope)).into_response()
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ApiEnvelope<T: Serialize> {
     pub code: i32,
     pub msg: String,
@@ -81,19 +86,16 @@ pub fn ok_empty() -> Response {
 }
 
 pub fn list_ok<T: Serialize>(list: T, count: i64) -> Response {
-    ok(json!({
+    ok(serde_json::json!({
         "list": list,
         "count": count
     }))
 }
 
-pub fn with_cookie(response: Response, cookie: &str) -> Response {
-    let mut resp = response;
-    if let Ok(value) = axum::http::HeaderValue::from_str(cookie) {
-        resp.headers_mut().insert(
-            axum::http::header::SET_COOKIE,
-            value,
-        );
-    }
-    resp
+pub fn with_set_cookie(mut response: Response, cookie: &str) -> Result<Response, ApiError> {
+    let value = HeaderValue::from_str(cookie).map_err(|e| ApiError::internal(e.to_string()))?;
+    response.headers_mut().append(SET_COOKIE, value);
+    Ok(response)
 }
+
+pub type ApiResult = Result<Response, ApiError>;

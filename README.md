@@ -52,20 +52,24 @@ docker run -d \
 
 ### LXC / Proxmox CT
 
-适用于 PVE 等虚拟化平台，直接运行无需 Docker：
+适用于 PVE 等虚拟化平台，直接复用 Alpine Docker 镜像 rootfs 创建 CT：
 
 ```bash
-# 创建容器（推荐 Debian 12）
-pct create 100 local:vztmpl/debian-12-standard.tar.zst --storage local
+docker pull ghcr.io/ytjungle666/yt-panel-new:latest
+cid=$(docker create ghcr.io/ytjungle666/yt-panel-new:latest)
+docker export "$cid" | zstd -19 -T0 -o /var/lib/vz/template/cache/yt-panel-alpine-ct-template.tar.zst -f
+docker rm -f "$cid"
 
-# 进入容器安装依赖
-pct enter 100
-apt-get update && apt-get install -y sqlite3 ca-certificates curl
-
-# 下载并运行
-curl -L -o /app/yt-panel https://github.com/YTjungle666/YT-Panel-NEW/releases/latest/download/yt-panel-linux-amd64
-chmod +x /app/yt-panel
-/app/yt-panel
+pct create 100 local:vztmpl/yt-panel-alpine-ct-template.tar.zst \
+  --ostype alpine \
+  --entrypoint /app/ct-entrypoint.sh \
+  --hostname yt-panel \
+  --memory 1024 \
+  --cores 2 \
+  --rootfs local-lvm:4 \
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+  --unprivileged 1 \
+  --start 1
 ```
 
 ---
@@ -146,6 +150,7 @@ python3 migrate_from_yt_panel.py --force --from /path/to/old-yt-panel
 - Node.js 22+
 - Rust 1.85+
 - npm / cargo
+- Docker + zstd（导出 PVE CT 模板时需要）
 
 ### 构建步骤
 
@@ -154,16 +159,19 @@ python3 migrate_from_yt_panel.py --force --from /path/to/old-yt-panel
 git clone https://github.com/YTjungle666/YT-Panel-NEW.git
 cd YT-Panel-NEW
 
-# 构建前端
-npm install
-npm run build
+# 类型检查
+npm ci
+npm run type-check
 
-# 构建后端
-cd backend
-cargo build --release
+# 构建前端和 musl 后端
+npm run build-only
+(cd backend && cargo build --release --target x86_64-unknown-linux-musl)
 
-# 运行
-cargo run
+# 构建 Alpine Docker 镜像
+docker build -t yt-panel:alpine .
+
+# 导出 PVE CT 模板
+./scripts/export-pve-template.sh yt-panel:alpine ./artifacts/YT-Panel-NEW/release/yt-panel-alpine-ct-template.tar.zst
 ```
 
 ---
@@ -181,7 +189,7 @@ cargo run
 | `GET /api/panel/bookmarks` | 书签列表 |
 | `POST /api/file/upload` | 文件上传 |
 
-完整 API 文档见项目源码 `backend/src/api/`。
+完整 API 路由与处理逻辑见项目源码 `backend/src/handlers/`。
 
 ---
 

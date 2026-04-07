@@ -11,6 +11,7 @@ backend/target/
 
 # Runtime data
 runtime/
+artifacts/
 uploads/
 database/
 *.db

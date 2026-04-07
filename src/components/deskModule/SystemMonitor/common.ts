@@ -26,7 +26,7 @@ export async function add(value: MonitorData): Promise<boolean> {
     newData.push(value)
     const res = await saveAll(newData)
     if (res.code !== 0)
-      console.log('save failed', res)
+      success = false
   }
   catch (error) {
     console.error(error)
@@ -49,7 +49,7 @@ export async function saveByIndex(index: number | undefined, value: MonitorData)
     newData[index] = value
     const res = await saveAll(newData)
     if (res.code !== 0)
-      console.log('save failed', res)
+      success = false
   }
   catch (error) {
     console.error(error)

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import GenericProgress from '../components/GenericProgress/index.vue'
 import { correctionNumberByCardStyle } from './common'
-import { getMemonyState } from '@/api/system/systemMonitor'
 import type { PanelPanelConfigStyleEnum } from '@/enums'
 import { bytesToSize } from '@/utils/cmn'
+import { useSharedSystemMonitor } from '../useSharedSystemMonitor'
 
 interface Prop {
   cardTypeStyle: PanelPanelConfigStyleEnum
@@ -15,34 +15,12 @@ interface Prop {
 }
 
 const props = defineProps<Prop>()
-let timer: ReturnType<typeof setInterval>
-const memoryState = ref<SystemMonitor.MemoryInfo | null>(null)
+const { monitorData } = useSharedSystemMonitor(props.refreshInterval)
+const memoryState = computed(() => monitorData.value?.memory || null)
 
 function formatMemorySize(v: number): string {
   return bytesToSize(v)
 }
-
-async function getData() {
-  try {
-    const { data, code } = await getMemonyState<SystemMonitor.MemoryInfo>()
-    if (code === 0)
-      memoryState.value = data
-  }
-  catch (error) {
-
-  }
-}
-
-onMounted(() => {
-  getData()
-  timer = setInterval(() => {
-    getData()
-  }, (!props.refreshInterval || props.refreshInterval <= 2000) ? 2000 : props.refreshInterval)
-})
-
-onUnmounted(() => {
-  clearInterval(timer)
-})
 </script>
 
 <template>

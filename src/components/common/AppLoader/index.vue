@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, shallowRef, watch } from 'vue'
+import { defineAsyncComponent, shallowRef, watch } from 'vue'
 import { NSpin } from 'naive-ui'
 
 const props = defineProps<{
@@ -24,11 +24,7 @@ function updateComponent() {
 
 watch(() => props.componentName, () => {
   updateComponent()
-})
-
-onMounted(() => {
-  updateComponent()
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -38,9 +34,7 @@ onMounted(() => {
       <!-- <component :is="getComponent(componentName || '')" v-if="dynamicComponent" /> -->
       <div
         v-else-if="!dynamicComponent"
-      >
-        Component not found!
-      </div>
+      />
     </NSpin>
   </div>
 </template>

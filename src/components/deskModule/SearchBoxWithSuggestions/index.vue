@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineEmits, onMounted, ref, computed, nextTick, watch } from 'vue'
+import { defineEmits, onBeforeUnmount, onMounted, ref, computed, nextTick, watch } from 'vue'
 import { NAvatar, NCheckbox, useMessage } from 'naive-ui'
 import { SvgIcon } from '@/components/common'
 import { useModuleConfig } from '@/store/modules'
@@ -672,214 +672,82 @@ const filteredSuggestions = computed(() => {
   return suggestionOptions.value.slice(0, 8)
 })
 
+const suggestionCache = new Map<string, SuggestionItem[]>()
+let latestSuggestionRequestId = 0
+let suggestionDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let blurHideTimer: ReturnType<typeof setTimeout> | null = null
+
 // 监听搜索词变化，获取动态提示词
-watch(searchTerm, async (newVal) => {
-  // 重置选中索引
+watch(searchTerm, (newVal) => {
   selectedIndex.value = -1
 
+  if (suggestionDebounceTimer) {
+    clearTimeout(suggestionDebounceTimer)
+    suggestionDebounceTimer = null
+  }
+
   if (newVal) {
-    await fetchSuggestions(newVal)
+    suggestionDebounceTimer = setTimeout(() => {
+      suggestionDebounceTimer = null
+      void fetchSuggestions(newVal)
+    }, 250)
   } else {
     suggestionOptions.value = []
   }
 })
 
-// 获取搜索引擎对应的提示词API
-const getSuggestionApiUrl = (engine: DeskModule.SearchBox.SearchEngine, keyword: string): string | null => {
-  // 根据搜索引擎返回对应的API URL
-  if (engine.title === 'Baidu') {
-    // 百度搜索建议API
-    return `https://sp0.baidu.com/5a1Fazu8AA54nxGko9WTAnF6hhy/su?wd=${encodeURIComponent(keyword)}&cb=callback`
-  } else if (engine.title === 'Google') {
-    // Google搜索建议API (JSONP格式)
-    return `https://suggestqueries.google.com/complete/search?client=firefox&hl=zh-CN&q=${encodeURIComponent(keyword)}&jsonp=callback`
-  } else if (engine.title === 'Bing') {
-    // Bing搜索建议API (JSONP格式)
-    return `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(keyword)}&JsonType=callback&JsonCallback=callback`
-  }
-  return null
-}
-
 // 获取搜索建议
 const fetchSuggestions = async (keyword: string) => {
-  if (!keyword) return
+  const trimmedKeyword = keyword.trim()
+  if (!trimmedKeyword) return
+
+  const requestId = ++latestSuggestionRequestId
+  const cacheKey = `${state.value.currentSearchEngine.title}:${trimmedKeyword}`
+  const cachedSuggestions = suggestionCache.get(cacheKey)
+  if (cachedSuggestions) {
+    suggestionOptions.value = cachedSuggestions
+    return
+  }
 
   loadingSuggestions.value = true
   try {
-    // 1. 根据开关状态决定是否搜索书签
-    const bookmarkSuggestions = state.value.searchBookmarks ? searchBookmarks(keyword) : []
-    const itemSuggestions = state.value.searchBookmarks ? searchTextIconItems(keyword) : []
+    const bookmarkSuggestions = state.value.searchBookmarks ? searchBookmarks(trimmedKeyword) : []
+    const itemSuggestions = state.value.searchBookmarks ? searchTextIconItems(trimmedKeyword) : []
 
-    // 2. 然后获取搜索引擎建议
-    const apiUrl = getSuggestionApiUrl(state.value.currentSearchEngine, keyword)
     let searchEngineSuggestions: SuggestionItem[] = []
-
-    if (!apiUrl) {
-      // 如果没有对应API，使用默认建议
-      searchEngineSuggestions = getDefaultSuggestions(keyword)
-    } else {
-      // 特殊处理各搜索引擎的JSONP请求
-      if (state.value.currentSearchEngine.title === 'Baidu') {
-        searchEngineSuggestions = await fetchBaiduSuggestions(apiUrl, keyword)
-      } else if (state.value.currentSearchEngine.title === 'Google') {
-        searchEngineSuggestions = await fetchGoogleSuggestions(apiUrl, keyword)
-      } else if (state.value.currentSearchEngine.title === 'Bing') {
-        searchEngineSuggestions = await fetchBingSuggestions(apiUrl, keyword)
-      }
+    if (trimmedKeyword.length >= 2) {
+      searchEngineSuggestions = getDefaultSuggestions(trimmedKeyword)
     }
 
-    // 3. 合并结果，书签/项目结果在前，搜索引擎结果在后
     const allSuggestions: SuggestionItem[] = dedupeSuggestions([
       ...bookmarkSuggestions,
       ...itemSuggestions,
       ...searchEngineSuggestions,
     ])
 
-    suggestionOptions.value = allSuggestions
-  } catch (error) {
-    console.error('获取搜索建议失败:', error)
-    // 出错时使用默认建议
-    const defaultSuggestions = getDefaultSuggestions(keyword)
-    // 根据开关状态决定是否搜索书签
-    const bookmarkSuggestions = state.value.searchBookmarks ? searchBookmarks(keyword) : []
-    const itemSuggestions = state.value.searchBookmarks ? searchTextIconItems(keyword) : []
+    if (requestId !== latestSuggestionRequestId)
+      return
 
-    // 合并结果，书签/项目结果在前，默认建议在后
+    suggestionOptions.value = allSuggestions
+    suggestionCache.set(cacheKey, allSuggestions)
+  } catch {
+    const defaultSuggestions = getDefaultSuggestions(trimmedKeyword)
+    const bookmarkSuggestions = state.value.searchBookmarks ? searchBookmarks(trimmedKeyword) : []
+    const itemSuggestions = state.value.searchBookmarks ? searchTextIconItems(trimmedKeyword) : []
     const allSuggestions: SuggestionItem[] = dedupeSuggestions([
       ...bookmarkSuggestions,
       ...itemSuggestions,
       ...defaultSuggestions,
     ])
 
+    if (requestId !== latestSuggestionRequestId)
+      return
+
     suggestionOptions.value = allSuggestions
   } finally {
-    loadingSuggestions.value = false
+    if (requestId === latestSuggestionRequestId)
+      loadingSuggestions.value = false
   }
-}
-
-// 获取百度搜索建议（JSONP处理）
-const fetchBaiduSuggestions = (apiUrl: string, keyword: string) => {
-  return new Promise<SuggestionItem[]>((resolve, reject) => {
-    // 创建script标签发送JSONP请求
-    const script = document.createElement('script')
-    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random())
-
-    // 定义全局回调函数
-    ;(window as any)[callbackName] = function(data: any) {
-      try {
-        // 清理
-        document.body.removeChild(script)
-        delete (window as any)[callbackName]
-
-        // 处理百度返回的数据: {q: "keyword", p: false, s: ["suggestion1", "suggestion2", ...]}
-        if (data && Array.isArray(data.s)) {
-          resolve(data.s.map((item: string) => ({ value: item })))
-        } else {
-          resolve([])
-        }
-      } catch (error) {
-        reject(error)
-      }
-    }
-
-    script.src = apiUrl.replace('callback', callbackName)
-    script.onerror = () => {
-      document.body.removeChild(script)
-      delete (window as any)[callbackName]
-      reject(new Error('JSONP请求失败'))
-    }
-
-    document.body.appendChild(script)
-  })
-}
-
-// 获取Google搜索建议（JSONP处理）
-const fetchGoogleSuggestions = (apiUrl: string, keyword: string) => {
-  return new Promise<SuggestionItem[]>((resolve, reject) => {
-    // 创建script标签发送JSONP请求
-    const script = document.createElement('script')
-    const callbackName = 'google_jsonp_callback_' + Math.round(100000 * Math.random())
-
-    // 定义全局回调函数
-    ;(window as any)[callbackName] = function(data: any) {
-      try {
-        // 清理
-        document.body.removeChild(script)
-        delete (window as any)[callbackName]
-
-        // 处理Google返回的数据: ["keyword", ["suggestion1", "suggestion2", ...], [], {...}]
-        // 第二个元素是包含搜索建议的数组
-        if (data && Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          // 确保我们只提取实际的建议字符串
-          resolve(data[1].map((item: string) => ({ value: item })))
-        } else {
-          console.error('Google搜索建议数据格式错误:', data)
-          // 使用默认建议
-          resolve(getDefaultSuggestions(keyword))
-        }
-      } catch (error) {
-        console.error('处理Google搜索建议失败:', error)
-        // 使用默认建议
-        resolve(getDefaultSuggestions(keyword))
-      }
-    }
-
-    // 替换Google搜索建议API的回调参数
-    script.src = apiUrl.replace(/jsonp=(callback|google_jsonp_callback_\d+)/, `jsonp=${callbackName}`)
-    script.onerror = () => {
-      document.body.removeChild(script)
-      delete (window as any)[callbackName]
-      console.error('Google搜索建议JSONP请求失败')
-      // 使用默认建议
-      resolve(getDefaultSuggestions(keyword))
-    }
-
-    document.body.appendChild(script)
-  })
-}
-
-// 获取Bing搜索建议（JSONP处理）
-const fetchBingSuggestions = (apiUrl: string, keyword: string) => {
-  return new Promise<SuggestionItem[]>((resolve, reject) => {
-    // 创建script标签发送JSONP请求
-    const script = document.createElement('script')
-    const callbackName = 'bing_jsonp_callback_' + Math.round(100000 * Math.random())
-
-    // 定义全局回调函数
-    ;(window as any)[callbackName] = function(data: any) {
-      try {
-        // 清理
-        document.body.removeChild(script)
-        delete (window as any)[callbackName]
-
-        // 处理Bing返回的数据: ["keyword", ["suggestion1", "suggestion2", ...]]
-        if (data && Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          // 确保我们只提取实际的建议字符串
-          resolve(data[1].map((item: string) => ({ value: item })))
-        } else {
-          console.error('Bing搜索建议数据格式错误:', data)
-          // 使用默认建议
-          resolve(getDefaultSuggestions(keyword))
-        }
-      } catch (error) {
-        console.error('处理Bing搜索建议失败:', error)
-        // 使用默认建议
-        resolve(getDefaultSuggestions(keyword))
-      }
-    }
-
-    // 替换Bing搜索建议API的回调参数
-    script.src = apiUrl.replace(/JsonCallback=(callback|bing_jsonp_callback_\d+)/, `JsonCallback=${callbackName}`)
-    script.onerror = () => {
-      document.body.removeChild(script)
-      delete (window as any)[callbackName]
-      console.error('Bing搜索建议JSONP请求失败')
-      // 使用默认建议
-      resolve(getDefaultSuggestions(keyword))
-    }
-
-    document.body.appendChild(script)
-  })
 }
 
 
@@ -917,9 +785,13 @@ const onFocus = (): void => {
 
 const onBlur = (): void => {
   // 添加延迟以允许点击下拉项
-  setTimeout(() => {
+  if (blurHideTimer)
+    clearTimeout(blurHideTimer)
+
+  blurHideTimer = setTimeout(() => {
     isFocused.value = false
     suggestionsVisible.value = false
+    blurHideTimer = null
   }, 200)
 }
 
@@ -1084,6 +956,21 @@ onMounted(() => {
     // 加载搜索引擎列表
     initSearchEngines()
   })
+})
+
+onBeforeUnmount(() => {
+  latestSuggestionRequestId += 1
+  loadingSuggestions.value = false
+
+  if (suggestionDebounceTimer) {
+    clearTimeout(suggestionDebounceTimer)
+    suggestionDebounceTimer = null
+  }
+
+  if (blurHideTimer) {
+    clearTimeout(blurHideTimer)
+    blurHideTimer = null
+  }
 })
 </script>
 

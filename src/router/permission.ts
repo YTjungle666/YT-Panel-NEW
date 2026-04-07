@@ -7,7 +7,7 @@ export function setupPageGuard(router: Router) {
     const authStore = useAuthStore()
 
     // If not logged in and trying to access protected routes, redirect to login
-    const publicRoutes = ['/home', '/login', '/register', '/reset-password', '/404', '/500', '/test']
+    const publicRoutes = ['/home', '/login', '/register', '/404', '/500']
     const isPublicRoute = publicRoutes.includes(to.path)
 
     const isLoggedIn = authStore.visitMode === VisitMode.VISIT_MODE_LOGIN && !!authStore.userInfo?.id

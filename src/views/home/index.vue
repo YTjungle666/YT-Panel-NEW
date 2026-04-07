@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NDropdown, NModal, NSkeleton, NSpin, useDialog, useMessage } from 'naive-ui'
-import { nextTick, onMounted, onActivated, ref, h, watch } from 'vue'
+import { defineAsyncComponent, nextTick, onMounted, onActivated, ref, h, watch } from 'vue'
 import { AppIcon, AppStarter, EditItem, NotePad } from './components'
 import { Clock, SystemMonitor } from '@/components/deskModule'
-import SearchBoxWithSuggestions from '@/components/deskModule/SearchBoxWithSuggestions/index.vue'
 import { SvgIcon } from '@/components/common'
 import { deletes, edit as editItem, getListByGroupId, getSiteFavicon, saveSort } from '@/api/panel/itemIcon'
 import { checkIsLan } from '@/api/system/network'
@@ -26,6 +25,8 @@ interface ItemGroup extends Panel.ItemIconGroup {
   hoverStatus: boolean
   items?: Panel.ItemInfo[]
 }
+
+const SearchBoxWithSuggestions = defineAsyncComponent(() => import('@/components/deskModule/SearchBoxWithSuggestions/index.vue'))
 
 const ms = useMessage()
 const dialog = useDialog()
@@ -1412,7 +1413,7 @@ function handleChangeNetwork(targetMode: PanelStateNetworkModeEnum) {
                       @click="handleAddItem(itemGroup.id)"
                     />
                   </div>
-                </vuedraggable>
+                </VueDraggable>
               </div>
             </div>
 

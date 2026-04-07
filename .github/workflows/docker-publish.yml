@@ -3,6 +3,7 @@ name: docker-publish
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +16,9 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/yt-panel-new
+  NODE_VERSION: '20'
+  RUST_VERSION: '1.85.1'
+  RUST_TARGET: 'x86_64-unknown-linux-musl'
 
 jobs:
   build:
@@ -22,6 +26,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build-only
+
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ env.RUST_TARGET }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Build Rust backend
+        working-directory: backend
+        run: cargo build --release --target ${{ env.RUST_TARGET }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -40,6 +78,22 @@ jobs:
         id: image
         run: echo "name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      - name: Compute image tags
+        id: tags
+        run: |
+          image='${{ steps.image.outputs.name }}'
+          short_sha="${GITHUB_SHA::7}"
+          tags="$image:sha-$short_sha"
+
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            tags="$tags,$image:${GITHUB_REF_NAME},$image:$version,$image:latest"
+          else
+            tags="$tags,$image:latest"
+          fi
+
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -47,6 +101,6 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.image.outputs.name }}:latest
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

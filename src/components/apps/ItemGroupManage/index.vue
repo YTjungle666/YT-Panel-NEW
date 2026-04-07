@@ -129,7 +129,6 @@ function handleSaveGroup() {
         editModalArg.value.model = { ...defaultMNodal }
       })
     }
-    else { console.log(errors) }
   })
 }
 

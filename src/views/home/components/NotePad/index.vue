@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { SvgIcon, SvgIconOnline } from '@/components/common'
 import { useMessage, useDialog } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
@@ -166,10 +166,6 @@ const selectNote = (note: NotepadInfo) => {
     currentNote.value = { ...note } // 立即切换状态
     if (editorRef.value) {
         editorRef.value.innerHTML = sanitizeNotepadHtml(note.content || '')
-        // 绑定文件下载事件
-        nextTick(() => {
-            bindFileDownloadEvents()
-        })
     }
     showList.value = false
 }
@@ -233,22 +229,20 @@ const deleteNote = async (note: NotepadInfo) => {
     })
 }
 
-// 绑定文件下载事件，确保下载时使用原始文件名
-const bindFileDownloadEvents = () => {
-    if (!editorRef.value) return
-    
-    const fileLinks = editorRef.value.querySelectorAll('.file-attachment')
-    fileLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault()
-            const url = link.getAttribute('href')
-            const filename = link.getAttribute('data-filename')
-            
-            if (url && filename) {
-                downloadFile(url, filename)
-            }
-        })
-    })
+const handleEditorClick = (event: MouseEvent) => {
+    const target = event.target as HTMLElement | null
+    const link = target?.closest('.file-attachment') as HTMLAnchorElement | null
+    if (!link) {
+        return
+    }
+
+    event.preventDefault()
+    const url = link.getAttribute('href')
+    const filename = link.getAttribute('data-filename')
+
+    if (url && filename) {
+        void downloadFile(url, filename)
+    }
 }
 
 // 下载文件并指定文件名
@@ -311,7 +305,7 @@ const execCommand = (command: string, value?: string) => {
                 if (el && el.tagName === 'PRE') {
                     if (!el.nextElementSibling) {
                         const div = document.createElement('div')
-                        div.innerHTML = '<br>'
+                        div.appendChild(document.createElement('br'))
                         el.parentNode?.insertBefore(div, el.nextSibling)
                     }
                 }
@@ -349,10 +343,6 @@ const initData = async () => {
                 if (isFocused) {
                     // restore cursor? 比较复杂，但在打开瞬间通常不需要。
                 }
-                // 绑定文件下载事件
-                nextTick(() => {
-                    bindFileDownloadEvents()
-                })
             }
         } else {
             // 如果不在了，选中第一个
@@ -441,7 +431,8 @@ const close = () => {
                 contenteditable="true"
                 class="w-full h-full p-3 outline-none overflow-y-auto text-sm text-gray-800 break-words font-sans leading-relaxed"
                 :data-placeholder="t('notepad.placeholder')"
-                 @input="handleInput"
+                @input="handleInput"
+                @click="handleEditorClick"
                 spellcheck="false"
              ></div>
          </div>

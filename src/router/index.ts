@@ -32,12 +32,6 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
-    path: '/reset-password',
-    name: 'reset-password',
-    component: () => import('@/views/reset-password/index.vue'),
-  },
-
-  {
     path: '/404',
     name: '404',
     component: () => import('@/views/exception/404/index.vue'),
@@ -53,12 +47,6 @@ const routes: RouteRecordRaw[] = [
     path: '/:pathMatch(.*)*',
     name: 'notFound',
     redirect: '/404',
-  },
-
-  {
-    path: '/test',
-    name: 'test',
-    component: () => import('@/views/exception/test/index.vue'),
   },
 
   // adminRouter,

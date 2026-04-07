@@ -155,7 +155,11 @@
       "connectionSuccess": "连接正常",
       "connectionFailed": "连接失败",
       "testing": "测试中...",
-      "pleaseEnterUrl": "请输入URL地址"
+      "pleaseEnterUrl": "请输入URL地址",
+      "passwordSecurity": "密码安全",
+      "passwordSecurityHint": "管理首次登录改密和弱密码策略。关闭弱密码后，所有设密入口都必须满足强密码要求。",
+      "allowWeakPassword": "允许弱密码",
+      "allowWeakPasswordHint": "仅在兼容旧环境时开启，默认应保持关闭"
     },
     "itemGroupManage": {
       "appName": "分组管理",
@@ -325,7 +329,6 @@
     "loginButton": "登录",
     "passwordPlaceholder": "密码",
     "registerButton": "注册",
-    "resetPasswordButton": "忘记密码",
     "usernamePlaceholder": "账号",
     "welcomeMessage": "欢迎回来！"
   },
@@ -358,29 +361,9 @@
     "logoutSuccess": "您已经安全退出，期待与你再次相见！",
     "newPassword": "新密码",
     "oldPassword": "旧密码",
-    "updatePassword": "修改密码"
-  },
-  "resetPassword": {
-    "title": "找回密码",
-    "description": "保留旧接口入口，但不伪造不可用的邮件重置成功。",
-    "emailPlaceholder": "请输入注册邮箱",
-    "emailCodePlaceholder": "请输入邮箱验证码",
-    "newPasswordPlaceholder": "请输入新密码",
-    "confirmPasswordPlaceholder": "请再次输入新密码",
-    "sendCode": "发送验证码",
-    "submit": "重置密码",
-    "backToLogin": "返回登录",
-    "statusNotice": "旧 YT-Panel 只保留了忘记密码前端 API 和邮件工具函数，但并没有把路由真正接通；Rust 版当前也未配置邮件发送，因此这里只保留入口、契约和明确提示。",
-    "contactAdmin": "当前实例暂未配置邮件重置能力，请联系管理员手动重置密码，或在已登录状态下使用“修改密码”。",
-    "sendCodeFailed": "验证码发送失败",
-    "resetFailed": "重置密码失败",
-    "resetSuccess": "密码已重置，请返回登录",
-    "emailRequired": "请输入邮箱",
-    "emailInvalid": "请输入正确的邮箱地址",
-    "codeRequired": "请输入邮箱验证码",
-    "passwordRequired": "请输入新密码",
-    "passwordLimit": "密码长度需在 6 到 64 个字符之间",
-    "confirmPasswordRequired": "请再次输入新密码",
-    "confirmPasswordMismatch": "两次输入的密码不一致"
+    "updatePassword": "修改密码",
+    "passwordLimit": "密码长度需在 8 到 64 个字符之间",
+    "forceChangePasswordNotice": "当前账号仍在使用初始密码，请先修改为强密码后再继续使用。",
+    "passwordUpdatedRelogin": "密码修改成功，请重新登录"
   }
 }

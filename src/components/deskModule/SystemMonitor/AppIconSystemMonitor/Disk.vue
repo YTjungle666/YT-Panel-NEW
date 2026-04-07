@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import GenericProgress from '../components/GenericProgress/index.vue'
 import { correctionNumberByCardStyle } from './common'
 import type { PanelPanelConfigStyleEnum } from '@/enums'
 import { bytesToSize } from '@/utils/cmn'
-import { getDiskStateByPath } from '@/api/system/systemMonitor'
+import { useSharedSystemMonitor } from '../useSharedSystemMonitor'
 
 interface Prop {
   cardTypeStyle: PanelPanelConfigStyleEnum
@@ -16,8 +16,11 @@ interface Prop {
 }
 
 const props = defineProps<Prop>()
-let timer: ReturnType<typeof setInterval>
-const diskState = ref<SystemMonitor.DiskInfo | null>(null)
+const { monitorData } = useSharedSystemMonitor(props.refreshInterval)
+const diskState = computed(() => {
+  const disks = monitorData.value?.disk || []
+  return disks.find((item: SystemMonitor.DiskInfo) => item.mountpoint === props.path) || null
+})
 
 function formatdiskSize(v: number): string {
   return bytesToSize(v)
@@ -26,28 +29,6 @@ function formatdiskSize(v: number): string {
 function formatdiskToByte(v: number): number {
   return v
 }
-
-async function getData() {
-  try {
-    const { data, code } = await getDiskStateByPath<SystemMonitor.DiskInfo>(props.path)
-    if (code === 0)
-      diskState.value = data
-  }
-  catch (error) {
-
-  }
-}
-
-onMounted(() => {
-  getData()
-  timer = setInterval(() => {
-    getData()
-  }, (!props.refreshInterval || props.refreshInterval <= 2000) ? 2000 : props.refreshInterval)
-})
-
-onUnmounted(() => {
-  clearInterval(timer)
-})
 </script>
 
 <template>

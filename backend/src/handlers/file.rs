@@ -1,227 +1,149 @@
-//! File handlers - 安全文件上传管理
-
-use axum::{
-    extract::{Multipart, State},
-    http::HeaderMap,
-    routing::post,
-    Json, Router,
-};
-use chrono::Utc;
-use serde_json::{json, Value};
 use std::path::Path;
 
+use axum::{extract::{Multipart, State}, http::HeaderMap, Json};
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+use mime_guess::MimeGuess;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use sqlx::Row;
+use tokio::fs;
+
 use crate::{
-    AppState, ApiResult, ApiError,
-    authenticate, AccessMode,
-    ok, list_ok, ok_empty,
-    random_token,
+    auth::authenticate,
+    error::{list_ok, ok, ok_empty, ApiError, ApiResult},
+    models::{AccessMode, AppState},
+    utils::{resolve_uploaded_file_path, save_upload_field},
 };
 
-/// 允许的文件类型
-const ALLOWED_TYPES: &[(&str, &[&str])] = &[
-    ("image/jpeg", &["jpg", "jpeg"]),
-    ("image/png", &["png"]),
-    ("image/gif", &["gif"]),
-    ("image/webp", &["webp"]),
-];
-
-const MAX_UPLOAD_SIZE: usize = 10 * 1024 * 1024; // 10MB
-
-/// 生成安全文件名
-fn generate_safe_filename(user_id: i64, ext: &str) -> String {
-    let timestamp = Utc::now().timestamp_millis();
-    let random = random_token(8);
-    format!("{}_{}_{}.{}", user_id, timestamp, random, ext)
+#[derive(Deserialize)]
+pub struct IdsRequest {
+    ids: Vec<i64>,
 }
 
-/// 上传图片
-async fn file_upload_img(
+pub async fn file_upload_img(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mut multipart: Multipart,
+) -> ApiResult {
+    let _auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
+    if let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::new(1300, e.to_string()))?
+    {
+        let file_name = field.file_name().unwrap_or("image.png").to_string();
+        let ext = Path::new(&file_name)
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("png")
+            .to_lowercase();
+        let allowed = ["png", "jpg", "jpeg", "gif", "webp", "ico"];
+        if !allowed.contains(&ext.as_str()) {
+            return Err(ApiError::new(1301, "Unsupported file format"));
+        }
+        let bytes = field
+            .bytes()
+            .await
+            .map_err(|e| ApiError::new(1300, e.to_string()))?;
+        const MAX_IMAGE_UPLOAD_BYTES: usize = 20 * 1024 * 1024;
+        if bytes.len() > MAX_IMAGE_UPLOAD_BYTES {
+            return Err(ApiError::new(1300, "file too large (max 20MB)"));
+        }
+        let mime = MimeGuess::from_ext(&ext).first_or_octet_stream();
+        let data_url = format!("data:{};base64,{}", mime, B64.encode(bytes));
+        return Ok(ok(json!({ "imageUrl": data_url })));
+    }
+    Err(ApiError::new(1300, "Upload failed"))
+}
+
+pub async fn file_upload_files(
     State(state): State<AppState>,
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> ApiResult {
     let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
-    
-    while let Some(field) = multipart.next_field().await.map_err(|e| ApiError::new(1400, e.to_string()))? {
-        let name = field.name().unwrap_or("").to_string();
-        if name != "file" {
-            continue;
-        }
-        
-        // 获取信息
-        let filename = field.file_name().unwrap_or("unknown").to_string();
-        let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
-        
-        // 验证 MIME
-        let mime_ok = ALLOWED_TYPES.iter().any(|(mime, _)| *mime == content_type);
-        if !mime_ok {
-            return Err(ApiError::new(1400, "Invalid file type"));
-        }
-        
-        // 验证扩展名
-        let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
-        let ext_ok = ALLOWED_TYPES.iter().any(|(_, exts)| exts.contains(&ext.as_str()));
-        if !ext_ok {
-            return Err(ApiError::new(1400, "Invalid file extension"));
-        }
-        
-        // 读取数据
-        let data = field.bytes().await.map_err(|e| ApiError::new(1400, e.to_string()))?;
-        
-        if data.is_empty() {
-            return Err(ApiError::new(1400, "Empty file"));
-        }
-        
-        if data.len() > MAX_UPLOAD_SIZE {
-            return Err(ApiError::new(1400, "File too large"));
-        }
-        
-        // 生成安全文件名
-        let safe_name = generate_safe_filename(auth.user.id, &ext);
-        let filepath = Path::new(&state.config.uploads_dir).join(&safe_name);
-        
-        // 确保目录存在
-        if let Some(parent) = filepath.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-        
-        // 写入文件
-        tokio::fs::write(&filepath, &data).await
-            .map_err(|e| ApiError::new(1500, format!("Failed to save file: {}", e)))?;
-        
-        return Ok(ok(json!({
-            "url": format!("/uploads/{}", safe_name),
-            "name": safe_name,
-            "size": data.len(),
-            "type": content_type,
-        })));
-    }
-    
-    Err(ApiError::new(1400, "No file uploaded"))
-}
-
-/// 上传多个文件
-async fn file_upload_files(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    mut multipart: Multipart,
-) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
-    let mut files: Vec<Value> = vec![];
-    
-    while let Some(field) = multipart.next_field().await.map_err(|e| ApiError::new(1400, e.to_string()))? {
-        let name = field.name().unwrap_or("").to_string();
-        if name != "files" {
-            continue;
-        }
-        
-        let filename = field.file_name().unwrap_or("unknown").to_string();
-        let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
-        
-        // 验证
-        let mime_ok = ALLOWED_TYPES.iter().any(|(mime, _)| *mime == content_type);
-        let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
-        let ext_ok = ALLOWED_TYPES.iter().any(|(_, exts)| exts.contains(&ext.as_str()));
-        
-        if !mime_ok || !ext_ok {
-            continue; // 跳过无效文件
-        }
-        
-        // 读取
-        let data = match field.bytes().await {
-            Ok(d) if d.len() <= MAX_UPLOAD_SIZE => d,
-            _ => continue,
-        };
-        
-        // 保存
-        let safe_name = generate_safe_filename(auth.user.id, &ext);
-        let filepath = Path::new(&state.config.uploads_dir).join(&safe_name);
-        
-        if let Some(parent) = filepath.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-        
-        if tokio::fs::write(&filepath, &data).await.is_ok() {
-            files.push(json!({
-                "url": format!("/uploads/{}", safe_name),
-                "name": safe_name,
-                "size": data.len(),
-                "type": content_type,
-            }));
-        }
-    }
-    
-    let count = files.len() as i64;
-    Ok(list_ok(files, count))
-}
-
-/// 获取文件列表
-async fn file_get_list(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
-    let mut files: Vec<Value> = vec![];
-    let uploads_path = Path::new(&state.config.uploads_dir);
-    
-    if let Ok(mut entries) = tokio::fs::read_dir(uploads_path).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let filename = entry.file_name().to_string_lossy().to_string();
-            // 只返回当前用户的文件
-            if !filename.starts_with(&format!("{}_", auth.user.id)) {
-                continue;
+    let mut succ_map = serde_json::Map::new();
+    let mut err_files = Vec::<String>::new();
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::new(1300, e.to_string()))?
+    {
+        let file_name = field.file_name().unwrap_or("upload.bin").to_string();
+        match save_upload_field(&state, auth.user.id, field, None).await {
+            Ok((relative_db_path, public_url, ext)) => {
+                sqlx::query("INSERT INTO file (src, user_id, file_name, method, ext, created_at, updated_at) VALUES (?, ?, ?, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+                    .bind(relative_db_path)
+                    .bind(auth.user.id)
+                    .bind(file_name.clone())
+                    .bind(ext)
+                    .execute(&state.db)
+                    .await
+                    .map_err(|e| ApiError::db(e.to_string()))?;
+                succ_map.insert(file_name, Value::String(public_url));
             }
-            
-            if let Ok(metadata) = entry.metadata().await {
-                files.push(json!({
-                    "name": filename,
-                    "url": format!("/uploads/{}", filename),
-                    "size": metadata.len() as i64,
-                }));
-            }
+            Err(_) => err_files.push(file_name),
         }
     }
-    
-    let count = files.len() as i64;
-    Ok(list_ok(files, count))
+    Ok(ok(json!({ "succMap": succ_map, "errFiles": err_files })))
 }
 
-/// 删除文件
-async fn file_deletes(
+pub async fn file_get_list(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<Value>,
 ) -> ApiResult {
     let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
-    
-    let names: Vec<String> = req.get("names")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-        .unwrap_or_default();
-    
-    let mut deleted = 0;
-    for name in names {
-        // 安全检查
-        if !name.starts_with(&format!("{}_", auth.user.id)) {
-            continue;
-        }
-        if name.contains('/') || name.contains("\\") || name.contains("..") {
-            continue;
-        }
-        
-        let filepath = Path::new(&state.config.uploads_dir).join(&name);
-        if tokio::fs::remove_file(&filepath).await.is_ok() {
-            deleted += 1;
-        }
-    }
-    
-    Ok(ok(json!({ "deleted": deleted })))
+    let rows = sqlx::query(
+        "SELECT id, src, file_name, created_at, updated_at FROM file WHERE user_id = ? ORDER BY created_at DESC",
+    )
+    .bind(auth.user.id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| ApiError::db(e.to_string()))?;
+    let list: Vec<Value> = rows
+        .into_iter()
+        .map(|row| {
+            let src: String = row.get("src");
+            json!({
+                "id": row.get::<i64, _>("id"),
+                "src": src.trim_start_matches('.'),
+                "fileName": row.try_get::<Option<String>, _>("file_name").unwrap_or(None),
+                "createTime": row.try_get::<Option<String>, _>("created_at").unwrap_or(None),
+                "updateTime": row.try_get::<Option<String>, _>("updated_at").unwrap_or(None),
+                "path": src,
+            })
+        })
+        .collect();
+    let count = list.len() as i64;
+    Ok(list_ok(list, count))
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/api/file/uploadImg", post(file_upload_img))
-        .route("/api/file/uploadFiles", post(file_upload_files))
-        .route("/api/file/getList", post(file_get_list))
-        .route("/api/file/deletes", post(file_deletes))
+pub async fn file_deletes(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<IdsRequest>,
+) -> ApiResult {
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
+    for id in req.ids {
+        if let Some(src) = sqlx::query_scalar::<_, String>(
+            "SELECT src FROM file WHERE id = ? AND user_id = ?",
+        )
+        .bind(id)
+        .bind(auth.user.id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| ApiError::db(e.to_string()))?
+        {
+            if let Some(path) = resolve_uploaded_file_path(&state.config.uploads_dir, &src) {
+                let _ = fs::remove_file(path).await;
+            }
+            sqlx::query("DELETE FROM file WHERE id = ? AND user_id = ?")
+                .bind(id)
+                .bind(auth.user.id)
+                .execute(&state.db)
+                .await
+                .map_err(|e| ApiError::db(e.to_string()))?;
+        }
+    }
+    Ok(ok_empty())
 }

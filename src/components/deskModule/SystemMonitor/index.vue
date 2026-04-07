@@ -248,7 +248,7 @@ function handleRightMenuSelect(key: string | number) {
               :icon-text-color="panelState.panelConfig.iconTextColor"
             />
           </div>
-        </vuedraggable>
+        </VueDraggable>
       </template>
 
 

@@ -1,48 +1,171 @@
-//! 通用工具函数
+use serde_json::Value;
+use std::net::IpAddr;
+use std::path::{Component, Path, PathBuf};
+use tokio::{fs, io::AsyncWriteExt};
 
-use rand::{distributions::Alphanumeric, Rng};
-use std::path::PathBuf;
+use chrono::{Datelike, Utc};
 
-/// 生成随机token
-pub fn random_token(len: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect()
+use crate::{auth::random_token, error::ApiError, models::AppState};
+
+/// 从 Option<Value> 解析 i64
+pub fn parse_i64(input: Option<&Value>) -> i64 {
+    input
+        .and_then(|v| v.as_i64())
+        .or_else(|| input.and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+        .unwrap_or(0)
 }
 
-/// 从SQLite URL提取数据库文件路径
-pub fn sqlite_file_path(database_url: &str) -> Option<PathBuf> {
-    let raw = database_url.trim();
-    if raw.is_empty() || raw.eq_ignore_ascii_case("sqlite::memory:") {
+/// 从 Option<Value> 解析 String
+pub fn parse_string(input: Option<&Value>) -> String {
+    input
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_default()
+}
+
+/// 从 Option<Value> 解析 Option<String>
+pub fn parse_opt_string(input: Option<&Value>) -> Option<String> {
+    input.and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
+/// 检查是否为私有 IP
+pub fn is_private_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_private() || v4.is_loopback() || v4.is_link_local(),
+        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unique_local() || v6.is_unicast_link_local(),
+    }
+}
+
+/// 从请求头提取客户端 IP
+pub fn extract_client_ip(headers: &axum::http::HeaderMap) -> Option<String> {
+    let keys = [
+        "cf-connecting-ip",
+        "x-forwarded-for",
+        "x-real-ip",
+        "x-original-forwarded-for",
+    ];
+
+    for key in keys {
+        if let Some(value) = headers.get(key).and_then(|v| v.to_str().ok()) {
+            return Some(value.split(',').next().unwrap_or(value).trim().to_string());
+        }
+    }
+
+    // RFC 7239 Forwarded
+    if let Some(value) = headers.get("forwarded").and_then(|v| v.to_str().ok()) {
+        if let Some(part) = value.split(';').find(|p| p.trim_start().starts_with("for=")) {
+            return Some(
+                part.trim()
+                    .trim_start_matches("for=")
+                    .trim_matches('"')
+                    .trim_matches('[')
+                    .trim_matches(']')
+                    .to_string(),
+            );
+        }
+    }
+
+    None
+}
+
+/// 上传路径前缀
+pub fn uploads_public_prefix(subdir: Option<&str>) -> String {
+    let mut parts = vec!["uploads".to_string()];
+    if let Some(subdir) = subdir.filter(|v| !v.is_empty()) {
+        parts.push(subdir.to_string());
+    }
+    parts.join("/")
+}
+
+/// 解析存储的文件路径为绝对路径
+pub fn resolve_uploaded_file_path(uploads_dir: &str, stored_src: &str) -> Option<PathBuf> {
+    let normalized = stored_src.trim();
+    if normalized.is_empty() {
         return None;
     }
-    let path_part = raw
-        .strip_prefix("sqlite://")
-        .or_else(|| raw.strip_prefix("sqlite:"))
-        .unwrap_or(raw)
-        .split('?')
-        .next()
-        .unwrap_or("")
-        .trim();
-    if path_part.is_empty() || path_part.eq_ignore_ascii_case(":memory:") {
-        return None;
+
+    let direct = Path::new(normalized);
+    if direct.is_absolute() {
+        return Some(direct.to_path_buf());
     }
-    Some(PathBuf::from(path_part))
+
+    for prefix in ["./uploads/", "/uploads/", "uploads/"] {
+        if let Some(suffix) = normalized.strip_prefix(prefix) {
+            return Some(Path::new(uploads_dir).join(suffix));
+        }
+    }
+
+    let trimmed = normalized.trim_start_matches("./");
+    if !trimmed.is_empty() {
+        let as_absolute = Path::new("/").join(trimmed);
+        if as_absolute.is_absolute()
+            && as_absolute.components().next() == Some(Component::RootDir)
+        {
+            return Some(as_absolute);
+        }
+
+        let as_relative = PathBuf::from(trimmed);
+        if as_relative.exists() {
+            return Some(as_relative);
+        }
+    }
+
+    None
 }
 
-/// 解析i64
-pub fn parse_i64(v: Option<&serde_json::Value>) -> i64 {
-    v.and_then(|x| x.as_i64()).unwrap_or(0)
-}
+pub async fn save_upload_field(
+    state: &AppState,
+    _user_id: i64,
+    field: axum::extract::multipart::Field<'_>,
+    subdir: Option<&str>,
+) -> Result<(String, String, String), ApiError> {
+    let file_name = field.file_name().unwrap_or("upload.bin").to_string();
+    let bytes = field
+        .bytes()
+        .await
+        .map_err(|e| ApiError::new(1300, e.to_string()))?;
+    let max = 20_u64 * 1024 * 1024;
+    if bytes.len() as u64 > max {
+        return Err(ApiError::new(1300, "file too large"));
+    }
 
-/// 解析字符串
-pub fn parse_string(v: Option<&serde_json::Value>) -> String {
-    v.and_then(|x| x.as_str()).map(|s| s.to_string()).unwrap_or_default()
-}
-
-/// 解析可选字符串
-pub fn parse_opt_string(v: Option<&serde_json::Value>) -> Option<String> {
-    v.and_then(|x| x.as_str()).map(|s| s.to_string())
+    let ext = Path::new(&file_name)
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("bin")
+        .to_lowercase();
+    let now = Utc::now();
+    let hash_input = format!(
+        "{}-{}-{}",
+        file_name,
+        now.timestamp_millis(),
+        random_token(6)
+    );
+    let safe_name = format!("{:x}", md5::compute(hash_input));
+    let public_prefix = uploads_public_prefix(subdir);
+    let relative_dir = format!(
+        "{}/{}/{}/{}",
+        public_prefix,
+        now.year(),
+        now.month(),
+        now.day()
+    );
+    let absolute_dir = Path::new(&state.config.uploads_dir)
+        .join(subdir.unwrap_or(""))
+        .join(now.year().to_string())
+        .join(now.month().to_string())
+        .join(now.day().to_string());
+    fs::create_dir_all(&absolute_dir)
+        .await
+        .map_err(|e| ApiError::new(1300, e.to_string()))?;
+    let absolute_path = absolute_dir.join(format!("{}.{}", safe_name, ext));
+    let mut file = fs::File::create(&absolute_path)
+        .await
+        .map_err(|e| ApiError::new(1300, e.to_string()))?;
+    file.write_all(&bytes)
+        .await
+        .map_err(|e| ApiError::new(1300, e.to_string()))?;
+    let relative_db_path = format!("./{}/{}.{}", relative_dir, safe_name, ext);
+    let public_url = format!("/{}/{}.{}", relative_dir, safe_name, ext);
+    Ok((relative_db_path, public_url, ext))
 }

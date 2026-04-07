@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormInst, FormRules } from 'naive-ui'
-import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
-import { ref } from 'vue'
+import { NAlert, NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
+import { computed, ref } from 'vue'
 import { useAppStore, useAuthStore, usePanelState, useUserStore } from '@/store'
 import { languageOptions } from '@/utils/defaultData'
 import type { Language, Theme } from '@/store/modules/app/helper'
@@ -12,7 +12,6 @@ import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
 import { ss } from '@/utils/storage'
 
-// 用户认证信息缓存键
 const USER_AUTH_INFO_CACHE_KEY = 'USER_AUTH_INFO_CACHE'
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -26,6 +25,7 @@ const themeValue = ref(appStore.theme)
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
 const formRef = ref<FormInst | null>(null)
+const isForcePasswordChange = computed(() => !!authStore.userInfo?.mustChangePassword)
 const themeOptions: { label: string; key: string; value: Theme }[] = [
   { label: t('apps.userInfo.themeStyle.dark'), key: 'dark', value: 'dark' },
   { label: t('apps.userInfo.themeStyle.light'), key: 'light', value: 'light' },
@@ -45,23 +45,23 @@ const updatePasswordModalFormRules: FormRules = {
   oldPassword: {
     required: true,
     trigger: 'blur',
-    min: 6,
-    max: 20,
-    message: t('adminSettingUsers.formRules.passwordLimit'),
+    min: 8,
+    max: 64,
+    message: t('settingUserInfo.passwordLimit'),
   },
   password: {
     required: true,
     trigger: 'blur',
-    min: 6,
-    max: 20,
-    message: t('adminSettingUsers.formRules.passwordLimit'),
+    min: 8,
+    max: 64,
+    message: t('settingUserInfo.passwordLimit'),
   },
   confirmPassword: {
     required: true,
     trigger: 'blur',
-    min: 6,
-    max: 20,
-    message: t('adminSettingUsers.formRules.passwordLimit'),
+    min: 8,
+    max: 64,
+    message: t('settingUserInfo.passwordLimit'),
   },
 }
 
@@ -71,20 +71,16 @@ async function logoutApi() {
   authStore.removeToken()
   panelState.removeState()
   appStore.removeToken()
-  // 清除用户认证信息缓存
-	window.localStorage.clear();
-	window.sessionStorage.clear();
+  window.localStorage.clear()
+  window.sessionStorage.clear()
   ms.success(t('settingUserInfo.logoutSuccess'))
-  // router.push({ path: '/login' })
-  location.reload()// 强制刷新一下页面
+  location.reload()
 }
 
 function handleSaveInfo() {
   updateInfo(nickName.value).then(({ code, msg }) => {
     if (code === 0) {
-      // 清除缓存，确保下次获取最新数据
       ss.remove(USER_AUTH_INFO_CACHE_KEY)
-      // 重新加载用户信息
       updateLocalUserInfo()
       isEditNickNameStatus.value = false
     }
@@ -94,25 +90,48 @@ function handleSaveInfo() {
   })
 }
 
+function resetPasswordForm() {
+  updatePasswordModalState.value.form = {
+    password: '',
+    oldPassword: '',
+    confirmPassword: '',
+  }
+}
+
+async function refreshUserAuthInfo() {
+  ss.remove(USER_AUTH_INFO_CACHE_KEY)
+  const authInfo = await updateLocalUserInfo()
+  if (authInfo?.user) {
+    authStore.setUserInfo(authInfo.user)
+  }
+}
+
+function openPasswordModal() {
+  updatePasswordModalState.value.show = true
+}
+
 function handleUpdatePassword(e: MouseEvent) {
   e.preventDefault()
   formRef.value?.validate((errors) => {
-    if (errors) {
+    if (errors)
       return
-    }
 
     if (updatePasswordModalState.value.form.password !== updatePasswordModalState.value.form.confirmPassword) {
       ms.error(t('settingUserInfo.confirmPasswordInconsistentMsg'))
       return
     }
     updatePasswordModalState.value.loading = true
-    updatePassword(updatePasswordModalState.value.form.oldPassword, updatePasswordModalState.value.form.password).then(({ code, msg }) => {
+    updatePassword(updatePasswordModalState.value.form.oldPassword, updatePasswordModalState.value.form.password).then(async ({ code, msg }) => {
       if (code === 0) {
-        // 成功
         updatePasswordModalState.value.show = false
-        ms.success(t('common.success'))
-        // 清除用户认证信息缓存
+        resetPasswordForm()
         ss.remove(USER_AUTH_INFO_CACHE_KEY)
+        await refreshUserAuthInfo()
+        ms.success(t('settingUserInfo.passwordUpdatedRelogin'))
+        await logoutApi()
+      }
+      else {
+        ms.error(msg || t('common.failed'))
       }
     }).finally(() => {
       updatePasswordModalState.value.loading = false
@@ -143,7 +162,6 @@ function handleChangeLanuage(value: Language) {
 function handleChangeTheme(value: Theme) {
   themeValue.value = value
   appStore.setTheme(value)
-  // location.reload()
 }
 </script>
 
@@ -203,7 +221,7 @@ function handleChangeTheme(value: Theme) {
 
       <NDivider style="margin: 10px 0;" dashed />
       <div>
-        <NButton size="small" text type="info" @click="updatePasswordModalState.show = !updatePasswordModalState.show">
+        <NButton size="small" text type="info" @click="openPasswordModal">
           {{ $t('settingUserInfo.updatePassword') }}
         </NButton>
       </div>
@@ -218,18 +236,21 @@ function handleChangeTheme(value: Theme) {
       </NButton>
     </NCard>
 
-    <RoundCardModal v-model:show="updatePasswordModalState.show" size="small" preset="card" style="width: 400px" :title="$t('settingUserInfo.updatePassword')">
+    <RoundCardModal v-model:show="updatePasswordModalState.show" size="small" preset="card" style="width: 420px" :mask-closable="!isForcePasswordChange" :closable="!isForcePasswordChange" :title="$t('settingUserInfo.updatePassword')">
+      <NAlert v-if="isForcePasswordChange" type="warning" class="mb-4">
+        {{ $t('settingUserInfo.forceChangePasswordNotice') }}
+      </NAlert>
       <NForm ref="formRef" :model="updatePasswordModalState.form" :rules="updatePasswordModalFormRules">
         <NFormItem path="oldPassword" :label="$t('settingUserInfo.oldPassword')">
-          <NInput v-model:value="updatePasswordModalState.form.oldPassword" :maxlength="20" type="password" :placeholder="$t('settingUserInfo.oldPassword')" />
+          <NInput v-model:value="updatePasswordModalState.form.oldPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.oldPassword')" />
         </NFormItem>
 
         <NFormItem path="password" :label="$t('settingUserInfo.newPassword')">
-          <NInput v-model:value="updatePasswordModalState.form.password" :maxlength="20" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
+          <NInput v-model:value="updatePasswordModalState.form.password" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
         </NFormItem>
 
         <NFormItem path="confirmPassword" :label="$t('settingUserInfo.confirmPassword')">
-          <NInput v-model:value="updatePasswordModalState.form.confirmPassword" :maxlength="20" type="password" :placeholder="$t('settingUserInfo.confirmPassword')" />
+          <NInput v-model:value="updatePasswordModalState.form.confirmPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.confirmPassword')" />
         </NFormItem>
       </NForm>
 

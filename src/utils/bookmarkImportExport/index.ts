@@ -22,16 +22,16 @@ export interface BookmarkFolder {
   isFolder: boolean
 }
 
+export type BookmarkTreeNode = BookmarkItem | BookmarkFolder
+
 export interface BookmarkJsonStructure {
   version: number
   appName: 'YT-Panel-Bookmark'
   exportTime: string
   appVersion: string
-  bookmarks: BookmarkFolder[]
+  bookmarks: BookmarkTreeNode[]
   md5: string
 }
-
-export type BookmarkTreeNode = BookmarkItem | BookmarkFolder
 
 export class FormatError extends Error {
   constructor(message: string) {
@@ -48,7 +48,7 @@ export class ConfigVersionLowError extends Error {
 }
 
 interface ExportBookmarkResult {
-  addBookmarksData(datas: BookmarkFolder[]): ExportBookmarkResult
+  addBookmarksData(datas: BookmarkTreeNode[]): ExportBookmarkResult
   exportFile(): void
   string(): string
 }
@@ -71,7 +71,7 @@ export function exportBookmarkJson(appVersion?: string): ExportBookmarkResult {
 
   return {
     // 添加书签信息
-    addBookmarksData(datas: BookmarkFolder[]) {
+    addBookmarksData(datas: BookmarkTreeNode[]) {
       jsonData.bookmarks = datas
       return this
     },
@@ -104,7 +104,7 @@ export interface ImportBookmarkResult {
   isPassCheckConfigVersionBest: () => boolean
   jsonStruct: BookmarkJsonStructure
   hasProperty: (key: string) => boolean
-  getBookmarks: () => BookmarkFolder[]
+  getBookmarks: () => BookmarkTreeNode[]
 }
 
 // 导入书签json数据
@@ -136,7 +136,7 @@ export function importBookmarkJsonString(jsonString: string): ImportBookmarkResu
     hasProperty: (key: string): boolean => {
       return key in jsonStruct
     },
-    getBookmarks: (): BookmarkFolder[] => {
+    getBookmarks: (): BookmarkTreeNode[] => {
       return jsonStruct.bookmarks || []
     },
   }

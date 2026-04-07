@@ -117,7 +117,7 @@ export async function updateLocalUserInfo() {
       userStore.updateUserInfo({ headImage: cachedData.user.headImage, name: cachedData.user.name })
       authStore.setUserInfo(cachedData.user)
       authStore.setVisitMode(cachedData.visitMode)
-      return
+      return cachedData
     }
 
     // 2. 缓存中没有数据，请求接口获取数据
@@ -130,6 +130,7 @@ export async function updateLocalUserInfo() {
 
     // 3. 将数据永久保存到缓存中
     ss.set(USER_AUTH_INFO_CACHE_KEY, data)
+    return data
   } catch (error) {
     console.error('获取用户认证信息失败', error)
     // 出错时尝试从缓存获取
@@ -138,6 +139,7 @@ export async function updateLocalUserInfo() {
       userStore.updateUserInfo({ headImage: cachedData.user.headImage, name: cachedData.user.name })
       authStore.setUserInfo(cachedData.user)
       authStore.setVisitMode(cachedData.visitMode)
+      return cachedData
     }
   }
 }

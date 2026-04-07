@@ -1,15 +1,13 @@
 declare namespace Login{
 
     interface LoginReqest{
-        username:string 
+        username:string
         password:string
         vcode?:string
     }
 
 	interface LoginResponse extends User.Info{
+		mustChangePassword?: boolean
 	}
-
-    interface ResetPasswordByVCodeReqest extends System.Register.SendRegisterVcodeRquest{
-    }
 
 }

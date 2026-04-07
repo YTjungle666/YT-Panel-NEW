@@ -1,4 +1,4 @@
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, onUnmounted, watch, type Ref } from 'vue'
 import { debounce } from 'lodash-es'
 import Fuse from 'fuse.js'
 import { searchBookmarks, type SearchResult } from '@/api/search'
@@ -59,6 +59,10 @@ export function useBookmarkSearch(
   // 监听输入
   watch(query, (newQuery) => {
     debouncedSearch(newQuery)
+  })
+
+  onUnmounted(() => {
+    debouncedSearch.cancel()
   })
 
   // 最终结果：优先后端，Fuse兜底

@@ -9,7 +9,6 @@ export const useNoticeStore = defineStore('notice-store', {
 
     // 设置已读
     setReadByGlobal(noticeId: number) {
-      console.log('设置全局已读', noticeId)
       this.global.push(noticeId)
       this.recordState()
     },

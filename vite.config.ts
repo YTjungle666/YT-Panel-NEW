@@ -5,6 +5,13 @@ import { createSvgIconsPlugin } from 'vite-plugin-svg-icons'
 
 export default defineConfig(() => {
   const outDir = process.env.YT_PANEL_DIST_OUT_DIR || 'dist'
+  const vendorChunkMatchers: Array<[string, string[]]> = [
+    ['naive-ui', ['/naive-ui/']],
+    ['markdown', ['/markdown-it/', '/highlight.js/', '/katex/', '/@traptitech/markdown-it-katex/']],
+    ['utils', ['/fuse.js/', '/dayjs/']],
+    ['ui-libs', ['/@vueuse/']],
+    ['vue-vendor', ['/vue-router/', '/pinia/', '/vue-i18n/', '/vue/']],
+  ]
 
   return {
     plugins: [
@@ -37,10 +44,14 @@ export default defineConfig(() => {
       sourcemap: false,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'naive-ui': ['naive-ui'],
-            'utils': ['lodash-es', 'fuse.js'],
-            'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          manualChunks(id) {
+            if (!id.includes('node_modules'))
+              return
+
+            for (const [chunkName, matchers] of vendorChunkMatchers) {
+              if (matchers.some(matcher => id.includes(matcher)))
+                return chunkName
+            }
           },
         },
       },

@@ -91,7 +91,6 @@ async function handleSubmit() {
       verificationRes = res
   }
 
-  // console.log('保存', currentMonitorData.value.extendParam)
   if (!verificationRes)
     return
 

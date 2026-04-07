@@ -101,8 +101,6 @@ const handleValidateButtonClick = (e: MouseEvent) => {
   formRef.value?.validate((errors) => {
     if (!errors)
       add()
-    else
-      console.log(errors)
   })
 }
 </script>

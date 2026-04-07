@@ -1,7 +1,12 @@
 import { darkTheme, lightTheme } from 'naive-ui'
 
 const setupScrollbarStyle = () => {
+  const existingStyle = document.getElementById('yt-panel-scrollbar-style')
+  if (existingStyle)
+    return
+
   const style = document.createElement('style')
+  style.id = 'yt-panel-scrollbar-style'
   const styleContent = `
     ::-webkit-scrollbar {
       background-color: transparent;
@@ -21,7 +26,7 @@ const setupScrollbarStyle = () => {
     }
   `
 
-  style.innerHTML = styleContent
+  style.textContent = styleContent
   document.head.appendChild(style)
 }
 
