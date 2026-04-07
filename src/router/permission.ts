@@ -18,6 +18,11 @@ export function setupPageGuard(router: Router) {
       return
     }
 
+    if (isLoggedIn && authStore.userInfo?.mustChangePassword && to.path !== '/home' && to.path !== '/login') {
+      next({ path: '/home' })
+      return
+    }
+
     next()
   })
 }

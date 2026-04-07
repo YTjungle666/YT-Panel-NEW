@@ -8,6 +8,7 @@ BACKEND_TARGET_DIR="${ARTIFACTS_DIR}/backend-target"
 RELEASE_DIR="${ARTIFACTS_DIR}/release"
 RUST_TARGET="${RUST_TARGET:-x86_64-unknown-linux-musl}"
 DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-yt-panel:local}"
+CT_IMAGE_NAME="${CT_IMAGE_NAME:-yt-panel:local-ct}"
 CT_TEMPLATE_NAME="${CT_TEMPLATE_NAME:-yt-panel-alpine-ct-template.tar.zst}"
 FRONTEND="false"
 BACKEND="false"
@@ -31,22 +32,14 @@ build_backend() {
   cargo build --release --target "$RUST_TARGET" --target-dir "$BACKEND_TARGET_DIR"
 }
 
-ensure_docker_inputs() {
-  if [[ ! -f "$REPO_ROOT/dist/index.html" ]]; then
-    cd "$REPO_ROOT"
-    npm run build-only
-  fi
-
-  if [[ ! -f "$REPO_ROOT/backend/target/${RUST_TARGET}/release/yt-panel-rust-backend" ]]; then
-    cd "$REPO_ROOT/backend"
-    cargo build --release --target "$RUST_TARGET"
-  fi
+build_image() {
+  cd "$REPO_ROOT"
+  docker build --target runtime -t "$DOCKER_IMAGE_NAME" .
 }
 
-build_image() {
-  ensure_docker_inputs
+build_ct_image() {
   cd "$REPO_ROOT"
-  docker build -t "$DOCKER_IMAGE_NAME" .
+  docker build --target ct-template -t "$CT_IMAGE_NAME" .
 }
 
 export_ct_template() {
@@ -62,8 +55,9 @@ export_ct_template() {
     exit 1
   fi
 
+  local image_name="$1"
   local cid
-  cid=$(docker create "$DOCKER_IMAGE_NAME")
+  cid=$(docker create "$image_name")
   trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' RETURN
 
   docker export "$cid" | zstd -19 -T0 -o "${RELEASE_DIR}/${CT_TEMPLATE_NAME}" -f
@@ -71,16 +65,11 @@ export_ct_template() {
 
 package_release() {
   ensure_dirs
-  local package_root="${RELEASE_DIR}/yt-panel-linux-amd64"
-  rm -rf "$package_root"
-  mkdir -p "$package_root/conf" "$package_root/web"
-
-  cp "$BACKEND_TARGET_DIR/${RUST_TARGET}/release/yt-panel-rust-backend" "$package_root/yt-panel"
-  cp "$REPO_ROOT/LICENSE" "$package_root/LICENSE"
-  cp "$REPO_ROOT/backend/config/docker.toml" "$package_root/conf/app.toml"
-  cp -R "$FRONTEND_DIST_DIR/." "$package_root/web/"
-
-  tar -C "$RELEASE_DIR" -czf "${RELEASE_DIR}/yt-panel-linux-amd64.tar.gz" "yt-panel-linux-amd64"
+  "$REPO_ROOT/scripts/prepare-release-files.sh" \
+    "$RELEASE_DIR" \
+    "$BACKEND_TARGET_DIR/${RUST_TARGET}/release/yt-panel-rust-backend" \
+    "$FRONTEND_DIST_DIR" \
+    "backend/config/docker.toml"
 }
 
 usage() {
@@ -128,5 +117,6 @@ if [[ "$IMAGE" == "true" ]]; then
 fi
 
 if [[ "$TEMPLATE" == "true" ]]; then
-  export_ct_template
+  build_ct_image
+  export_ct_template "$CT_IMAGE_NAME"
 fi

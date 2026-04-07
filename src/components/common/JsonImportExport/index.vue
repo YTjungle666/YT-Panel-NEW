@@ -21,9 +21,11 @@ const exportJson = () => {
   if (jsonData.value) {
     const blob = new Blob([jsonData.value], { type: 'application/json' })
     const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
+    const objectUrl = URL.createObjectURL(blob)
+    link.href = objectUrl
     link.download = 'exported_data.json'
     link.click()
+    URL.revokeObjectURL(objectUrl)
   }
 }
 </script>

@@ -226,7 +226,7 @@ pub async fn seed_defaults(db: &SqlitePool, config: &AppConfig) -> anyhow::Resul
         let password = hash("123456", 12)?;
         let token = random_token(48);
         sqlx::query(
-            "INSERT INTO user (username, password, name, status, role, token, must_change_password, created_at, updated_at) VALUES (?, ?, ?, 1, 1, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            "INSERT INTO user (username, password, name, status, role, token, must_change_password, created_at, updated_at) VALUES (?, ?, ?, 1, 1, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
         )
         .bind("admin")
         .bind(password)
@@ -245,6 +245,7 @@ pub async fn seed_defaults(db: &SqlitePool, config: &AppConfig) -> anyhow::Resul
         json!({ "allowWeakPassword": false }).to_string(),
     )
     .await?;
+    ensure_setting(db, "public_crypto_key", random_token(64)).await?;
     if let Some(public_user_id) = config.public_user_id {
         ensure_setting(db, "panel_public_user_id", public_user_id.to_string()).await?;
     }
@@ -258,17 +259,15 @@ pub async fn load_user_by(
     field: &str,
     value: &str,
 ) -> Result<Option<CurrentUser>, ApiError> {
-    let allowed_fields = ["id", "username", "mail", "token"];
-    if !allowed_fields.contains(&field) {
-        return Err(ApiError::bad_param("invalid field"));
-    }
+    let sql = match field {
+        "id" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE id = ? LIMIT 1",
+        "username" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE username = ? LIMIT 1",
+        "mail" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE mail = ? LIMIT 1",
+        "token" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE token = ? LIMIT 1",
+        _ => return Err(ApiError::bad_param("invalid field")),
+    };
 
-    let sql = format!(
-        "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE {} = ? LIMIT 1",
-        field
-    );
-
-    let row = sqlx::query(&sql)
+    let row = sqlx::query(sql)
         .bind(value)
         .fetch_optional(db)
         .await

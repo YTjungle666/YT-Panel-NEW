@@ -19,8 +19,6 @@ export interface HttpOption {
 
 export interface Response<T = any> {
   data: T
-  // message: string | null
-  // status: string
   msg: string
   code: number
 }
@@ -35,11 +33,9 @@ function http<T = any>(
       return res.data
 
     if (res.data.code === 1001) {
-      // 避免重复弹窗
       if (loginMessageShow === false) {
         loginMessageShow = true
         message.warning(t('api.loginExpires'), {
-          // message.warning('登录过期', {
           onLeave() {
             loginMessageShow = false
           },
@@ -62,10 +58,12 @@ function http<T = any>(
       return res.data
     }
 
+    if (res.data.code === 1108) {
+      message.warning(res.data.msg)
+      return res.data
+    }
+
     if (res.data.code === -1) {
-      // message.warning(res.data.msg)
-      // router.push({ path: '/login' })
-      // authStore.removeToken()
       return res.data
     }
 
@@ -75,13 +73,17 @@ function http<T = any>(
       return res.data
   }
 
-  const failHandler = (error: Response<Error>) => {
+  const failHandler = (error: any) => {
     afterRequest?.()
+    const structured = error?.response?.data
+    if (structured && typeof structured.code === 'number')
+      return successHandler({ data: structured } as AxiosResponse<Response<T>>)
+
     message.error(t('common.networkError'), {
       duration: 50000,
       closable: true,
     })
-    throw new Error(error?.msg || 'Error')
+    throw new Error(error?.response?.data?.msg || error?.msg || 'Error')
   }
 
   beforeRequest?.()

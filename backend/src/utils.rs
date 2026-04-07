@@ -5,7 +5,11 @@ use tokio::{fs, io::AsyncWriteExt};
 
 use chrono::{Datelike, Utc};
 
-use crate::{auth::random_token, error::ApiError, models::AppState};
+use crate::{
+    auth::random_token,
+    error::ApiError,
+    models::{AppConfig, AppState},
+};
 
 /// 从 Option<Value> 解析 i64
 pub fn parse_i64(input: Option<&Value>) -> i64 {
@@ -113,6 +117,10 @@ pub fn resolve_uploaded_file_path(uploads_dir: &str, stored_src: &str) -> Option
     None
 }
 
+pub fn max_upload_bytes(config: &AppConfig) -> u64 {
+    config.max_upload_mb.saturating_mul(1024 * 1024)
+}
+
 pub async fn save_upload_field(
     state: &AppState,
     _user_id: i64,
@@ -124,9 +132,12 @@ pub async fn save_upload_field(
         .bytes()
         .await
         .map_err(|e| ApiError::new(1300, e.to_string()))?;
-    let max = 20_u64 * 1024 * 1024;
+    let max = max_upload_bytes(&state.config);
     if bytes.len() as u64 > max {
-        return Err(ApiError::new(1300, "file too large"));
+        return Err(ApiError::new(
+            1300,
+            format!("file too large (max {}MB)", state.config.max_upload_mb),
+        ));
     }
 
     let ext = Path::new(&file_name)

@@ -3,6 +3,7 @@ import type { ModuleConfigState } from './helper'
 import { getLocalState, setLocalState } from './helper'
 import { getValueByName, save } from '@/api/system/moduleConfig'
 import { ss } from '@/utils/storage'
+import { logError } from '@/utils/logger'
 
 export const useModuleConfig = defineStore('module-config-store', {
   state: (): ModuleConfigState => getLocalState(),
@@ -28,7 +29,7 @@ export const useModuleConfig = defineStore('module-config-store', {
 
         return response
       } catch (error) {
-        console.error(`获取模块配置失败: ${name}`, error)
+        logError(`获取模块配置失败: ${name}`, error)
         // 如果出错，尝试从缓存获取
         const cachedData = ss.get(cacheKey)
         if (cachedData) {
@@ -54,15 +55,6 @@ export const useModuleConfig = defineStore('module-config-store', {
 
       return response
     },
-
-    // 从网络同步
-    // syncFromCloud(moduleName: string) {
-    //   getValueByName<any>(moduleName).then(({ code, data, msg }) => {
-    //     if (code === 0)
-    //       this.$state[moduleName] = data
-    //   })
-    // },
-
     recordState() {
       setLocalState(this.$state)
     },

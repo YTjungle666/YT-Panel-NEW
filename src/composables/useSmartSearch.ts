@@ -2,6 +2,7 @@ import { ref, computed, onUnmounted, watch, type Ref } from 'vue'
 import { debounce } from 'lodash-es'
 import Fuse from 'fuse.js'
 import { searchBookmarks, type SearchResult } from '@/api/search'
+import { logError } from '@/utils/logger'
 
 // Re-export SearchResult for convenience
 export type { SearchResult } from '@/api/search'
@@ -49,7 +50,7 @@ export function useBookmarkSearch(
       const res = await searchBookmarks({ query: q, limit: 20, search_url: true })
       backendResults.value = res.data || []
     } catch (e) {
-      console.error('Search failed:', e)
+      logError('Search failed', e)
       backendResults.value = []
     } finally {
       loading.value = false

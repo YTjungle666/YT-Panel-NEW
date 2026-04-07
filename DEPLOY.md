@@ -37,14 +37,13 @@ scp ./artifacts/YT-Panel-NEW/release/yt-panel-alpine-ct-template.tar.zst \
 
 # 在 PVE 宿主机上创建 CT，无需再进入容器补环境
 pct create 100 local:vztmpl/yt-panel-alpine-ct-template.tar.zst \
-  --ostype alpine \
-  --entrypoint /app/ct-entrypoint.sh \
+  --ostype unmanaged \
   --hostname yt-panel \
   --memory 1024 \
   --cores 2 \
   --rootfs local-lvm:4 \
   --net0 name=eth0,bridge=vmbr0,ip=dhcp \
-  --unprivileged 1 \
+  --unprivileged 0 \
   --start 1
 
 # 验证

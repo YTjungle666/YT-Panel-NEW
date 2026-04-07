@@ -12,7 +12,7 @@ use crate::{
     auth::authenticate,
     error::{list_ok, ok, ok_empty, ApiError, ApiResult},
     models::{AccessMode, AppState},
-    utils::{resolve_uploaded_file_path, save_upload_field},
+    utils::{max_upload_bytes, resolve_uploaded_file_path, save_upload_field},
 };
 
 #[derive(Deserialize)]
@@ -45,9 +45,12 @@ pub async fn file_upload_img(
             .bytes()
             .await
             .map_err(|e| ApiError::new(1300, e.to_string()))?;
-        const MAX_IMAGE_UPLOAD_BYTES: usize = 20 * 1024 * 1024;
-        if bytes.len() > MAX_IMAGE_UPLOAD_BYTES {
-            return Err(ApiError::new(1300, "file too large (max 20MB)"));
+        let max_bytes = max_upload_bytes(&state.config) as usize;
+        if bytes.len() > max_bytes {
+            return Err(ApiError::new(
+                1300,
+                format!("file too large (max {}MB)", state.config.max_upload_mb),
+            ));
         }
         let mime = MimeGuess::from_ext(&ext).first_or_octet_stream();
         let data_url = format!("data:{};base64,{}", mime, B64.encode(bytes));

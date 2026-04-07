@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22.22.1'
   RUST_VERSION: '1.85.1'
   RUST_TARGET: 'x86_64-unknown-linux-musl'
 
@@ -23,10 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -35,7 +35,7 @@ jobs:
         run: npm ci
 
       - name: Audit frontend dependencies
-        run: npm audit --omit=dev
+        run: npm audit
 
       - name: Type-check frontend
         run: npm run type-check
@@ -47,13 +47,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ env.RUST_TARGET }}
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -65,8 +65,8 @@ jobs:
         working-directory: backend
         run: cargo build --release --target ${{ env.RUST_TARGET }}
 
-      - name: Build Docker image
-        run: docker build -t yt-panel-ci:test .
+      - name: Build CT export image
+        run: docker build --target ct-template -t yt-panel-ci:test .
 
       - name: Install zstd
         run: sudo apt-get install -y zstd
@@ -75,17 +75,10 @@ jobs:
         run: ./scripts/export-pve-template.sh yt-panel-ci:test release-out/yt-panel-alpine-ct-template.tar.zst
 
       - name: Prepare release files
-        run: |
-          mkdir -p release-out/yt-panel-linux-amd64/conf release-out/yt-panel-linux-amd64/web
-          cp backend/target/${{ env.RUST_TARGET }}/release/yt-panel-rust-backend release-out/yt-panel-linux-amd64/yt-panel
-          cp LICENSE release-out/yt-panel-linux-amd64/LICENSE
-          cp -r dist/. release-out/yt-panel-linux-amd64/web/
-          cp backend/config/docker.toml release-out/yt-panel-linux-amd64/conf/app.toml
-          tar -czf yt-panel-linux-amd64.tar.gz -C release-out yt-panel-linux-amd64
-          mv yt-panel-linux-amd64.tar.gz release-out/
+        run: ./scripts/prepare-release-files.sh release-out backend/target/${{ env.RUST_TARGET }}/release/yt-panel-rust-backend dist backend/config/docker.toml
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: yt-panel-release
           path: release-out/

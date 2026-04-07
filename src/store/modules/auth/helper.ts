@@ -1,33 +1,33 @@
 import type { AuthState } from './index'
-import { ss } from '@/utils/storage'
+import { removeScopedStorage } from '@/utils/storage'
 
 const LOCAL_NAME = 'AUTH_TOKEN'
+const APP_STORAGE_KEYS = [
+  LOCAL_NAME,
+  'USER_AUTH_INFO_CACHE',
+  'USER_CONFIG_CACHE',
+  'groupListCache',
+  'bookmarksTreeCache',
+  'searchEngineListCache',
+]
+const APP_STORAGE_PREFIXES = [
+  'moduleConfig_',
+  'ITEM_ICON_LIST_CACHE_',
+  'itemIconList_',
+]
 
-// export function getToken() {
-//   return ss.get(LOCAL_NAME)
-// }
-
-// export function setToken(token: string) {
-//   return ss.set(LOCAL_NAME, token)
-// }
-
-// export function setUserInfo(userInfo: User.Info) {
-//   return ss.set(LOCAL_NAME, userInfo)
-// }
-
-// export function getUserInfo() {
-//   return ss.get(LOCAL_NAME)
-// }
-
-export function setStorage(state: AuthState) {
-  return ss.set(LOCAL_NAME, state)
+export function setStorage(_state: AuthState) {
+  return null
 }
 
 export function getStorage() {
-  return ss.get(LOCAL_NAME)
+  return null
 }
 
 export function removeToken() {
-  // ss.clear()
-  return ss.remove(LOCAL_NAME)
+  return removeScopedStorage(APP_STORAGE_KEYS, APP_STORAGE_PREFIXES)
+}
+
+export function clearAppScopedStorage() {
+  return removeScopedStorage(APP_STORAGE_KEYS, APP_STORAGE_PREFIXES)
 }

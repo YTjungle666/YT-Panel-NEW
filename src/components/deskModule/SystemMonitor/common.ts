@@ -1,5 +1,6 @@
 import type { MonitorData } from './typings'
 import { useModuleConfig } from '@/store/modules'
+import { logError } from '@/utils/logger'
 
 const modelName = 'systemMonitor'
 const moduleConfig = useModuleConfig()
@@ -29,7 +30,7 @@ export async function add(value: MonitorData): Promise<boolean> {
       success = false
   }
   catch (error) {
-    console.error(error)
+    logError('保存系统监控配置失败', error)
     success = false
   }
   return success
@@ -52,7 +53,7 @@ export async function saveByIndex(index: number | undefined, value: MonitorData)
       success = false
   }
   catch (error) {
-    console.error(error)
+    logError('更新系统监控配置失败', error)
     success = false
   }
   return success
@@ -81,7 +82,7 @@ export async function deleteByIndex(index: number): Promise<boolean> {
   }
   catch (error) {
     success = false
-    console.error(error)
+    logError('删除系统监控配置失败', error)
   }
 
   return success

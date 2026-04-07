@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use axum::{extract::State, http::HeaderMap, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use sqlx::Row;
+use sqlx::{QueryBuilder, Row, Sqlite};
 use sysinfo::{Disks, System};
 
 use crate::{
@@ -59,16 +59,19 @@ pub async fn notice_get_list(
     if req.display_type.is_empty() {
         return Ok(list_ok(Vec::<Value>::new(), 0));
     }
-    let placeholders = vec!["?"; req.display_type.len()].join(",");
-    let sql = format!(
-        "SELECT id, title, content, display_type, one_read, url, is_login, user_id, created_at, updated_at FROM notice WHERE display_type IN ({})",
-        placeholders
+    let mut builder = QueryBuilder::<Sqlite>::new(
+        "SELECT id, title, content, display_type, one_read, url, is_login, user_id, created_at, updated_at \
+         FROM notice WHERE display_type IN (",
     );
-    let mut query = sqlx::query(&sql);
-    for item in &req.display_type {
-        query = query.bind(item);
+    {
+        let mut separated = builder.separated(", ");
+        for item in &req.display_type {
+            separated.push_bind(item);
+        }
     }
-    let rows = query
+    builder.push(")");
+    let rows = builder
+        .build()
         .fetch_all(&state.db)
         .await
         .map_err(|e| ApiError::db(e.to_string()))?;

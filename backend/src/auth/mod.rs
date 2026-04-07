@@ -1,4 +1,11 @@
-use axum::http::{header::AUTHORIZATION, HeaderMap};
+use std::time::{Duration, Instant};
+
+use axum::{
+    extract::{Request, State},
+    http::{header::AUTHORIZATION, HeaderMap, Method},
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -7,11 +14,13 @@ use sqlx::SqlitePool;
 use crate::error::ApiError;
 use crate::{
     db::{get_setting, load_user_by_id, load_user_by_persistent_token, parse_public_user_id_setting},
-    models::{AccessMode, AppState, AuthContext},
+    models::{AccessMode, AppState, AuthCacheEntry, AuthContext, CurrentUser},
 };
 
 pub const SESSION_COOKIE_NAME: &str = "yt_panel_session";
 pub const SESSION_COOKIE_MAX_AGE: i64 = 60 * 60 * 24 * 30;
+pub const AUTH_CACHE_TTL: Duration = Duration::from_secs(60 * 15);
+pub const AUTH_CACHE_MAX_ENTRIES: usize = 2048;
 
 pub fn random_token(len: usize) -> String {
     rand::thread_rng()
@@ -112,6 +121,105 @@ pub async fn invalidate_cached_token(state: &AppState, token: Option<&str>) {
     if let Some(token) = token.filter(|value| !value.is_empty()) {
         state.auth_cache.write().await.remove(token);
     }
+}
+
+pub async fn cache_authenticated_user(state: &AppState, token: &str, user: CurrentUser) {
+    if token.is_empty() {
+        return;
+    }
+
+    let now = Instant::now();
+    let mut cache = state.auth_cache.write().await;
+    cache.retain(|_, entry| entry.expires_at > now);
+
+    if cache.len() >= AUTH_CACHE_MAX_ENTRIES {
+        let mut oldest_key = None::<String>;
+        let mut oldest_expiry = None::<Instant>;
+        for (key, entry) in cache.iter() {
+            if oldest_expiry
+                .map(|expiry| entry.expires_at < expiry)
+                .unwrap_or(true)
+            {
+                oldest_expiry = Some(entry.expires_at);
+                oldest_key = Some(key.clone());
+            }
+        }
+        if let Some(key) = oldest_key {
+            cache.remove(&key);
+        }
+    }
+
+    cache.insert(
+        token.to_string(),
+        AuthCacheEntry {
+            user,
+            expires_at: now + AUTH_CACHE_TTL,
+        },
+    );
+}
+
+pub async fn resolve_user_by_token(
+    state: &AppState,
+    incoming_token: &str,
+) -> Result<Option<CurrentUser>, ApiError> {
+    if incoming_token.is_empty() {
+        return Ok(None);
+    }
+
+    let now = Instant::now();
+    {
+        let mut cache = state.auth_cache.write().await;
+        if let Some(entry) = cache.get_mut(incoming_token) {
+            if entry.expires_at > now {
+                entry.expires_at = now + AUTH_CACHE_TTL;
+                return Ok(Some(entry.user.clone()));
+            }
+            cache.remove(incoming_token);
+        }
+    }
+
+    let user = load_user_by_persistent_token(&state.db, incoming_token).await?;
+    if let Some(user) = user.clone() {
+        if user.status == 1 {
+            cache_authenticated_user(state, incoming_token, user.clone()).await;
+        } else {
+            invalidate_cached_token(state, Some(incoming_token)).await;
+        }
+    }
+    Ok(user)
+}
+
+fn password_change_allowed_path(path: &str) -> bool {
+    matches!(
+        path,
+        "/api/user/getInfo" | "/api/user/getAuthInfo" | "/api/user/updatePassword" | "/api/logout"
+    )
+}
+
+pub async fn enforce_password_change_middleware(
+    State(state): State<AppState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if request.method() == Method::OPTIONS {
+        return next.run(request).await;
+    }
+
+    if let Some(token) = request_token_value(request.headers()) {
+        match resolve_user_by_token(&state, &token).await {
+            Ok(Some(user))
+                if user.status == 1
+                    && user.must_change_password == 1
+                    && !password_change_allowed_path(request.uri().path()) =>
+            {
+                return ApiError::password_change_required().into_response();
+            }
+            Ok(_) => {}
+            Err(err) => return err.into_response(),
+        }
+    }
+
+    next.run(request).await
 }
 
 pub async fn verify_password(plain: &str, stored: &str) -> bool {
@@ -236,27 +344,14 @@ pub async fn authenticate(
     mode: AccessMode,
 ) -> Result<AuthContext, ApiError> {
     if let Some(incoming_token) = request_token_value(headers) {
-        if let Some(cached_user) = state.auth_cache.read().await.get(&incoming_token).cloned() {
-            if cached_user.status == 1 {
+        if let Some(user) = resolve_user_by_token(state, &incoming_token).await? {
+            if user.status == 1 {
                 return Ok(AuthContext {
-                    user: cached_user,
+                    user,
                     visit_mode: 0,
                 });
             }
-            state.auth_cache.write().await.remove(&incoming_token);
-        }
-
-        if let Some(user) = load_user_by_persistent_token(&state.db, &incoming_token).await? {
-            if user.status == 1 {
-                state
-                    .auth_cache
-                    .write()
-                    .await
-                    .insert(incoming_token.clone(), user.clone());
-                return Ok(AuthContext { user, visit_mode: 0 });
-            }
-
-            state.auth_cache.write().await.remove(&incoming_token);
+            invalidate_cached_token(state, Some(&incoming_token)).await;
             if matches!(mode, AccessMode::LoginRequired) {
                 return Err(ApiError::new(1004, "Account disabled or not activated"));
             }

@@ -34,7 +34,6 @@ function updateCurrentDate() {
   // 获取当前的日期
   const day = now.getDate()
   const month = now.getMonth() + 1 // 月份从0开始，所以要加1
-  // const year = now.getFullYear()
 
   const daysOfWeek = [
     t('deskModule.clock.sun'),
@@ -45,7 +44,6 @@ function updateCurrentDate() {
     t('deskModule.clock.fri'),
     t('deskModule.clock.sat'),
   ]
-  // const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   currentDate.value.week = daysOfWeek[now.getDay()]
   currentDate.value.date = `${month}-${day}`
 }

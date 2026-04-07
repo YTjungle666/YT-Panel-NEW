@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -15,6 +15,8 @@ pub struct AppConfig {
     pub max_upload_mb: u64,
     pub public_user_id: Option<i64>,
     pub crypto_key: Option<String>,
+    #[serde(default)]
+    pub cors_allowed_origins: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -28,6 +30,7 @@ impl Default for AppConfig {
             max_upload_mb: 20,
             public_user_id: Some(1),
             crypto_key: None,
+            cors_allowed_origins: Vec::new(),
         }
     }
 }
@@ -45,6 +48,12 @@ pub struct CurrentUser {
     pub referral_code: Option<String>,
     pub token: Option<String>,
     pub must_change_password: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthCacheEntry {
+    pub user: CurrentUser,
+    pub expires_at: Instant,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -87,7 +96,7 @@ pub struct RegisterConfig {
 pub struct AppState {
     pub db: SqlitePool,
     pub config: Arc<AppConfig>,
-    pub auth_cache: Arc<RwLock<HashMap<String, CurrentUser>>>,
+    pub auth_cache: Arc<RwLock<HashMap<String, AuthCacheEntry>>>,
 }
 
 pub fn build_user_payload(
@@ -99,7 +108,6 @@ pub fn build_user_payload(
     role: i64,
     mail: Option<String>,
     referral_code: Option<String>,
-    token: Option<String>,
     created_at: Option<String>,
     updated_at: Option<String>,
     must_change_password: i64,
@@ -114,7 +122,6 @@ pub fn build_user_payload(
         "role": role,
         "mail": mail,
         "referralCode": referral_code,
-        "token": token,
         "createTime": created_at,
         "updateTime": updated_at,
         "mustChangePassword": must_change_password == 1,
@@ -137,7 +144,6 @@ pub fn row_to_user_payload(row: SqliteRow) -> Value {
             .unwrap_or(2),
         row.try_get("mail").unwrap_or(None),
         row.try_get("referral_code").unwrap_or(None),
-        row.try_get("token").unwrap_or(None),
         row.try_get::<Option<String>, _>("created_at").unwrap_or(None),
         row.try_get::<Option<String>, _>("updated_at").unwrap_or(None),
         row.try_get::<Option<i64>, _>("must_change_password")

@@ -1,22 +1,52 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
+    http::{
+        header::{AUTHORIZATION, CONTENT_TYPE},
+        HeaderName, HeaderValue, Method,
+    },
+    middleware,
     routing::{get, post},
     Router,
 };
 use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
 use tracing::info;
 use yt_panel_rust_backend::{
+    auth::enforce_password_change_middleware,
     db::{ensure_parent_dirs, init_db, seed_defaults},
     handlers::{
         auth as auth_handlers, file as file_handlers, panel as panel_handlers,
         search as search_handlers, system as system_handlers, user as user_handlers,
     },
-    models::AppState,
+    models::{AppConfig, AppState},
 };
+
+fn build_cors_layer(config: &AppConfig) -> anyhow::Result<CorsLayer> {
+    let base = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([
+            CONTENT_TYPE,
+            AUTHORIZATION,
+            HeaderName::from_static("lang"),
+        ])
+        .allow_credentials(true);
+
+    if config.cors_allowed_origins.is_empty() {
+        return Ok(base);
+    }
+
+    let origins = config
+        .cors_allowed_origins
+        .iter()
+        .map(|origin| HeaderValue::from_str(origin))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(base.allow_origin(AllowOrigin::list(origins)))
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -45,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
     let frontend_dir = std::path::PathBuf::from(&config.frontend_dist);
     let frontend_index = frontend_dir.join("index.html");
+    let cors = build_cors_layer(&config)?;
 
     let api = Router::new()
         .route("/api/login", post(auth_handlers::login))
@@ -244,11 +275,16 @@ async fn main() -> anyhow::Result<()> {
             get(search_handlers::search_suggestions),
         )
         .route("/ping", get(auth_handlers::ping))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            enforce_password_change_middleware,
+        ))
         .with_state(state.clone());
 
     let app = api
         .nest_service("/uploads", ServeDir::new(config.uploads_dir.clone()))
         .fallback_service(ServeDir::new(frontend_dir).fallback(ServeFile::new(frontend_index)))
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
 
     let addr = format!("{}:{}", config.host, config.port);

@@ -6,7 +6,20 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./docker-data/database:/app/database
-      - ./docker-data/uploads:/app/uploads
+      - yt-panel-database:/app/database
+      - yt-panel-uploads:/app/uploads
     # 如需自定义配置，可取消下面一行注释并提供本地 app.toml
     # - ./docker-data/config/app.toml:/app/conf/app.toml:ro
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ping >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  yt-panel-database:
+  yt-panel-uploads:

@@ -1,5 +1,4 @@
 import { ss } from '@/utils/storage'
-// import userDefaultAvatar from '@/assets/userDefaultAvatar.png'
 
 const LOCAL_NAME = 'moduleConfig'
 

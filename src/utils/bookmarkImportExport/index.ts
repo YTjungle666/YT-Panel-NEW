@@ -83,9 +83,11 @@ export function exportBookmarkJson(appVersion?: string): ExportBookmarkResult {
       if (jsonString) {
         const blob = new Blob([jsonString], { type: 'application/json' })
         const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
+        const objectUrl = URL.createObjectURL(blob)
+        link.href = objectUrl
         link.download = `SunPanel-Bookmark${dayjs().format('YYYYMMDDHHmm')}.yt-panel.json`
         link.click()
+        URL.revokeObjectURL(objectUrl)
       }
     },
 

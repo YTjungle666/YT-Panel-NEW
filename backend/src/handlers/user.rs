@@ -5,9 +5,9 @@ use serde_json::{json, Value};
 
 use crate::{
     auth::{
-        authenticate, build_cleared_session_cookie, ensure_admin, invalidate_cached_token,
-        random_token, request_is_https, validate_password_by_policy, validate_register_email,
-        validate_register_username, verify_password,
+        authenticate, build_session_cookie, cache_authenticated_user, ensure_admin,
+        invalidate_cached_token, random_token, request_is_https, validate_password_by_policy,
+        validate_register_email, validate_register_username, verify_password,
     },
     db::{
         get_setting, load_user_by_id, load_user_by_mail, load_user_by_username,
@@ -73,9 +73,12 @@ pub async fn user_get_info(
     Ok(ok(json!({
         "userId": auth.user.id,
         "id": auth.user.id,
+        "username": auth.user.username,
         "headImage": auth.user.head_image,
         "name": auth.user.name,
         "role": auth.user.role,
+        "mail": auth.user.mail,
+        "mustChangePassword": auth.user.must_change_password == 1,
     })))
 }
 
@@ -132,20 +135,26 @@ pub async fn user_update_password(
         return Err(ApiError::new(1007, "Old password error"));
     }
     validate_password_by_policy(&state.db, &req.new_password).await?;
-    let new_hash = hash(req.new_password.trim(), 12)
-        .map_err(|e| ApiError::new(-1, e.to_string()))?;
+    let new_hash = hash(req.new_password.trim(), 12).map_err(|e| ApiError::internal(e.to_string()))?;
+    let new_token = random_token(48);
     sqlx::query(
-        "UPDATE user SET password = ?, token = '', must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE user SET password = ?, token = ?, must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
     )
     .bind(new_hash)
+    .bind(&new_token)
     .bind(auth.user.id)
     .execute(&state.db)
     .await
     .map_err(|e| ApiError::db(e.to_string()))?;
     invalidate_cached_token(&state, fresh.token.as_deref()).await;
+    let mut refreshed_user = fresh.clone();
+    refreshed_user.password = String::new();
+    refreshed_user.token = Some(new_token.clone());
+    refreshed_user.must_change_password = 0;
+    cache_authenticated_user(&state, &new_token, refreshed_user).await;
     with_set_cookie(
         ok_empty(),
-        &build_cleared_session_cookie(request_is_https(&headers)),
+        &build_session_cookie(&new_token, request_is_https(&headers)),
     )
 }
 
@@ -213,7 +222,7 @@ pub async fn panel_users_create(
         .filter(|value| !value.is_empty())
         .unwrap_or(username)
         .to_string();
-    let password_hash = hash(password, 12).map_err(|e| ApiError::new(-1, e.to_string()))?;
+    let password_hash = hash(password, 12).map_err(|e| ApiError::internal(e.to_string()))?;
 
     let result = sqlx::query(
         "INSERT INTO user (username, password, name, head_image, status, role, mail, token, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, '', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
@@ -239,7 +248,6 @@ pub async fn panel_users_create(
         role,
         mail,
         None,
-        Some(String::new()),
         None,
         None,
         0,
@@ -327,7 +335,7 @@ pub async fn panel_users_update(
             .map_err(|e| ApiError::db(e.to_string()))?;
     } else {
         validate_password_by_policy(&state.db, password).await?;
-        let password_hash = hash(password, 12).map_err(|e| ApiError::new(-1, e.to_string()))?;
+        let password_hash = hash(password, 12).map_err(|e| ApiError::internal(e.to_string()))?;
         sqlx::query("UPDATE user SET username = ?, password = ?, name = ?, head_image = ?, status = ?, role = ?, mail = ?, token = '', must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             .bind(username)
             .bind(password_hash)
@@ -353,7 +361,6 @@ pub async fn panel_users_update(
         role,
         mail,
         existing.referral_code,
-        Some(String::new()),
         None,
         None,
         if password.is_empty() || password == "-" {

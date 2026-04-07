@@ -5,3 +5,4 @@ uploads_dir = "/app/uploads"
 frontend_dist = "/app/web"
 max_upload_mb = 10
 public_user_id = 1
+cors_allowed_origins = []

@@ -5,6 +5,7 @@ import type { PanelStateNetworkModeEnum } from '@/enums'
 import { get as getUserConfig } from '@/api/panel/userConfig'
 import { ss } from '@/utils/storage'
 import { sanitizeFooterHtml } from '@/utils/sanitize'
+import { logError } from '@/utils/logger'
 
 // 用户配置缓存键
 const USER_CONFIG_CACHE_KEY = 'USER_CONFIG_CACHE'
@@ -18,12 +19,10 @@ export const usePanelState = defineStore('panel', {
   actions: {
     setLeftSiderCollapsed(Collapsed: boolean) {
       this.leftSiderCollapsed = Collapsed
-      // this.recordState()
     },
 
     setRightSiderCollapsed(Collapsed: boolean) {
       this.rightSiderCollapsed = Collapsed
-      // this.recordState()
     },
 
     setNetworkMode(mode: PanelStateNetworkModeEnum) {
@@ -63,7 +62,7 @@ export const usePanelState = defineStore('panel', {
           this.recordState()
         })
       } catch (error) {
-        console.error('获取用户配置失败', error)
+        logError('获取用户配置失败', error)
         // 出错时尝试从缓存获取
         const cachedData = ss.get(USER_CONFIG_CACHE_KEY)
         if (cachedData) {
@@ -81,15 +80,7 @@ export const usePanelState = defineStore('panel', {
     resetPanelConfig() {
       this.panelConfig = defaultStatePanelConfig()
     },
-
-    // async refreshSpaceNoteList(spaceId: string) {
-    //   await getListBySpaceNoteId<Common.ListResponse<SNote.InfoTree[]>>(spaceId).then((res) => {
-    //     this.notesList = res.data.list
-    //   })
-    // },
-
     async reloadRoute(id?: number) {
-      // this.recordState()
       await router.push({ name: 'AppletDialog', params: { aiAppletId: id } })
     },
 

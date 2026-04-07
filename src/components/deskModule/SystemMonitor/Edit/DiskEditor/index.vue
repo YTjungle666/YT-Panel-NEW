@@ -9,6 +9,7 @@ import { PanelPanelConfigStyleEnum } from '@/enums'
 import { getDiskMountpoints } from '@/api/system/systemMonitor'
 import { defautSwatchesBackground } from '@/utils/defaultData'
 import { t } from '@/locales'
+import { logError } from '@/utils/logger'
 
 interface Emit {
   (e: 'update:diskExtendParam', visible: DiskExtendParam): void
@@ -74,7 +75,7 @@ defineExpose({
       return Promise.resolve(false)
     }
     catch (error) {
-      console.error('An error occurred during validation:', error)
+      logError('An error occurred during validation', error)
       return Promise.resolve(false)
     }
   },

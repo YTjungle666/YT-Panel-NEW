@@ -11,6 +11,7 @@ import { ss } from '@/utils/storage/local'
 import { addMultiple as addMultipleIcons, getListByGroupId } from '@/api/panel/itemIcon'
 
 import { t } from '@/locales'
+import { logError } from '@/utils/logger'
 
 interface ItemGroup extends Panel.ItemIconGroup {
   items?: Panel.ItemInfo[]
@@ -200,11 +201,11 @@ function importCheck() {
     catch (error) {
       if (error instanceof ConfigVersionLowError) {
         ms.error(t('apps.exportImport.errorConfigFileLow'))
-        console.error('The configuration file version is too low to be compatible')
+        logError('The configuration file version is too low to be compatible')
       }
       else if (error instanceof FormatError) {
         ms.error(t('apps.exportImport.errorConfigFileFormat'))
-        console.error('The format is incorrect and cannot be imported')
+        logError('The format is incorrect and cannot be imported')
       }
     }
   }
@@ -296,10 +297,6 @@ async function handleStartImport() {
       <NButton @click="importCheck">
         检查导入
       </NButton>
-
-      <!-- <NButton @click="exportJsonS">
-      导出JSON
-    </NButton> -->
 
       <NButton @click="jsonData = ''">
         清空导入数据

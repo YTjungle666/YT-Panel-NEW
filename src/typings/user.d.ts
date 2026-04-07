@@ -11,7 +11,6 @@ declare namespace User{
 		role?:number
 		mail?:string
 		// userId?:string // id代替
-		token?:string
 		isAdmin?:number
 		mustChangePassword?: boolean
 	}

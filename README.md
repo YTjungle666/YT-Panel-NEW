@@ -63,14 +63,13 @@ docker export "$cid" | zstd -19 -T0 -o /var/lib/vz/template/cache/yt-panel-alpin
 docker rm -f "$cid"
 
 pct create 100 local:vztmpl/yt-panel-alpine-ct-template.tar.zst \
-  --ostype alpine \
-  --entrypoint /app/ct-entrypoint.sh \
+  --ostype unmanaged \
   --hostname yt-panel \
   --memory 1024 \
   --cores 2 \
   --rootfs local-lvm:4 \
   --net0 name=eth0,bridge=vmbr0,ip=dhcp \
-  --unprivileged 1 \
+  --unprivileged 0 \
   --start 1
 ```
 

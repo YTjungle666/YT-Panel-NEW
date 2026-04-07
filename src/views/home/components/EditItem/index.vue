@@ -48,11 +48,6 @@ const rules: FormRules = {
     type: 'string',
     message: t('form.required'),
   },
-  // itemIconGroupId: {
-  //   required: true,
-  //   trigger: ['blur', 'change'],
-  //   message: t('form.required'),
-  // },
 }
 
 const options = [

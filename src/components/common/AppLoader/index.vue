@@ -1,29 +1,50 @@
 <script setup lang="ts">
 import { defineAsyncComponent, shallowRef, watch } from 'vue'
 import { NSpin } from 'naive-ui'
+import type { Component } from 'vue'
 
 const props = defineProps<{
   componentName: string | null
 }>()
 const loading = shallowRef(false)
-const dynamicComponent = shallowRef('')
+const dynamicComponent = shallowRef<Component | null>(null)
 
-function updateComponent() {
-  loading.value = true
-  dynamicComponent.value = defineAsyncComponent(() =>
-    import(`../../apps/${props.componentName}/index.vue`)
-      .finally(() => {
-        loading.value = false
-      }).catch(() => {
-      // 组件不存在
-        dynamicComponent.value = ''
-        return null
-      }),
-  )
+const componentLoaders: Record<string, () => Promise<any>> = {
+  About: () => import('../../apps/About/index.vue'),
+  ImportExport: () => import('../../apps/ImportExport/index.vue'),
+  ItemGroupManage: () => import('../../apps/ItemGroupManage/index.vue'),
+  Settings: () => import('../../apps/Settings/index.vue'),
+  Style: () => import('../../apps/Style/index.vue'),
+  UploadFileManager: () => import('../../apps/UploadFileManager/index.vue'),
+  UserInfo: () => import('../../apps/UserInfo/index.vue'),
+  Users: () => import('../../apps/Users/index.vue'),
 }
 
-watch(() => props.componentName, () => {
-  updateComponent()
+function updateComponent(componentName: string | null) {
+  const loader = componentName ? componentLoaders[componentName] : null
+  if (!loader) {
+    dynamicComponent.value = null
+    loading.value = false
+    return
+  }
+
+  loading.value = true
+  dynamicComponent.value = defineAsyncComponent(async () => {
+    try {
+      return await loader()
+    }
+    catch {
+      dynamicComponent.value = null
+      return { default: null }
+    }
+    finally {
+      loading.value = false
+    }
+  })
+}
+
+watch(() => props.componentName, (componentName) => {
+  updateComponent(componentName)
 }, { immediate: true })
 </script>
 
@@ -31,7 +52,6 @@ watch(() => props.componentName, () => {
   <div class="h-full">
     <NSpin :show="loading" style="height: 100%;" content-style="height: 100%;" :delay="500" description="loading...">
       <component :is="dynamicComponent" v-if="dynamicComponent" />
-      <!-- <component :is="getComponent(componentName || '')" v-if="dynamicComponent" /> -->
       <div
         v-else-if="!dynamicComponent"
       />

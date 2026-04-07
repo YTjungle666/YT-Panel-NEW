@@ -1,7 +1,10 @@
-import DOMPurify from 'dompurify'
+import DOMPurify, { type Config } from 'dompurify'
 
-export function sanitizeHtml(html: string, options?: DOMPurify.Config) {
-  return DOMPurify.sanitize(html || '', options)
+export function sanitizeHtml(html: string, options?: Config): string {
+  return DOMPurify.sanitize(html || '', {
+    RETURN_TRUSTED_TYPE: false,
+    ...options,
+  }) as string
 }
 
 function escapeHtml(text: string) {
@@ -30,7 +33,7 @@ export function sanitizeNotepadHtml(html: string) {
     ALLOWED_TAGS: ['div', 'p', 'br', 'b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'pre', 'blockquote', 'h1', 'h2', 'hr', 'img', 'a'],
     ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'data-filename'],
     ALLOW_DATA_ATTR: true,
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|\/|\.{1,2}\/|data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);base64,)/i,
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|\/|\.{1,2}\/|data:image\/(?:png|jpeg|jpg|gif|webp);base64,)/i,
   })
 }
 

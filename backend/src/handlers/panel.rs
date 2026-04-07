@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    net::IpAddr,
     path::Path,
 };
 
@@ -15,13 +16,14 @@ use regex::Regex;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::{Row, SqlitePool};
+use tokio::net::lookup_host;
 use url::Url;
 
 use crate::{
     auth::authenticate,
     error::{list_ok, ok, ok_empty, ApiError, ApiResult},
     models::{AccessMode, AppState, BookmarkNode},
-    utils::{parse_i64, parse_opt_string, parse_string, save_upload_field},
+    utils::{is_private_ip, parse_i64, parse_opt_string, parse_string, save_upload_field},
 };
 
 #[derive(Deserialize)]
@@ -544,11 +546,70 @@ pub async fn panel_item_icon_save_sort(
 
 fn build_favicon_client() -> Result<reqwest::Client, ApiError> {
     reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(5))
+        .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(std::time::Duration::from_secs(3))
         .timeout(std::time::Duration::from_secs(6))
         .build()
         .map_err(|e| ApiError::new(-1, e.to_string()))
+}
+
+fn is_blocked_outbound_hostname(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    matches!(
+        host.as_str(),
+        "localhost"
+            | "metadata"
+            | "metadata.google.internal"
+            | "metadata.aliyun.internal"
+            | "instance-data"
+    ) || host.ends_with(".localhost")
+        || host.ends_with(".local")
+}
+
+fn is_unsafe_outbound_ip(ip: IpAddr) -> bool {
+    is_private_ip(ip) || ip.is_multicast() || ip.is_unspecified()
+}
+
+async fn ensure_safe_outbound_url(url: &Url) -> Result<(), ApiError> {
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+    }
+
+    let host = url
+        .host_str()
+        .ok_or_else(|| ApiError::new(-1, "invalid or unsafe URL"))?;
+
+    if is_blocked_outbound_hostname(host) {
+        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+    }
+
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if is_unsafe_outbound_ip(ip) {
+            return Err(ApiError::new(-1, "invalid or unsafe URL"));
+        }
+        return Ok(());
+    }
+
+    let port = url.port_or_known_default().unwrap_or(80);
+    let mut resolved_any = false;
+    let addrs = lookup_host((host, port))
+        .await
+        .map_err(|_| ApiError::new(-1, "invalid or unsafe URL"))?;
+    for addr in addrs {
+        resolved_any = true;
+        if is_unsafe_outbound_ip(addr.ip()) {
+            return Err(ApiError::new(-1, "invalid or unsafe URL"));
+        }
+    }
+
+    if !resolved_any {
+        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+    }
+
+    Ok(())
 }
 
 static ATTR_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -734,6 +795,10 @@ async fn resolve_site_favicon_with_cache(state: &AppState, url: &str) -> Result<
 }
 
 async fn fetch_html_document(client: &reqwest::Client, url: &Url) -> Result<Option<String>, ApiError> {
+    if ensure_safe_outbound_url(url).await.is_err() {
+        return Ok(None);
+    }
+
     let resp = match client
         .get(url.clone())
         .header(reqwest::header::USER_AGENT, "YT-Panel/1.0")
@@ -771,6 +836,10 @@ async fn fetch_manifest_document(
     client: &reqwest::Client,
     url: &Url,
 ) -> Result<Option<String>, ApiError> {
+    if ensure_safe_outbound_url(url).await.is_err() {
+        return Ok(None);
+    }
+
     let resp = match client
         .get(url.clone())
         .header(reqwest::header::USER_AGENT, "YT-Panel/1.0")
@@ -801,6 +870,10 @@ async fn fetch_favicon_data_url(
     client: &reqwest::Client,
     url: &Url,
 ) -> Result<Option<String>, ApiError> {
+    if ensure_safe_outbound_url(url).await.is_err() {
+        return Ok(None);
+    }
+
     let resp = match client
         .get(url.clone())
         .header(reqwest::header::USER_AGENT, "YT-Panel/1.0")
@@ -850,9 +923,7 @@ async fn fetch_favicon_data_url(
 
 async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
     let parsed = Url::parse(url).map_err(|_| ApiError::new(-1, "invalid or unsafe URL"))?;
-    if !matches!(parsed.scheme(), "http" | "https") {
-        return Err(ApiError::new(-1, "invalid or unsafe URL"));
-    }
+    ensure_safe_outbound_url(&parsed).await?;
 
     let host = parsed
         .host_str()
@@ -869,7 +940,7 @@ async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
     if let Some(html) = fetch_html_document(&client, &parsed).await? {
         let (html_icons, manifest_urls) = extract_icon_candidates_from_html(&parsed, &html);
         for icon_url in html_icons {
-            if seen.insert(icon_url.to_string()) {
+            if ensure_safe_outbound_url(&icon_url).await.is_ok() && seen.insert(icon_url.to_string()) {
                 candidates.push(icon_url);
             }
         }
@@ -877,7 +948,7 @@ async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
         for manifest_url in manifest_urls {
             if let Some(manifest_text) = fetch_manifest_document(&client, &manifest_url).await? {
                 for icon_url in extract_manifest_icon_candidates(&manifest_url, &manifest_text) {
-                    if seen.insert(icon_url.to_string()) {
+                    if ensure_safe_outbound_url(&icon_url).await.is_ok() && seen.insert(icon_url.to_string()) {
                         candidates.push(icon_url);
                     }
                 }
@@ -892,7 +963,7 @@ async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
     ];
     for candidate in fallback_candidates {
         if let Ok(url) = Url::parse(&candidate) {
-            if seen.insert(url.to_string()) {
+            if ensure_safe_outbound_url(&url).await.is_ok() && seen.insert(url.to_string()) {
                 candidates.push(url);
             }
         }
@@ -904,7 +975,7 @@ async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
             format!("{}/images/logo-128.png", origin.trim_end_matches('/')),
         ] {
             if let Ok(url) = Url::parse(&candidate) {
-                if seen.insert(url.to_string()) {
+                if ensure_safe_outbound_url(&url).await.is_ok() && seen.insert(url.to_string()) {
                     candidates.push(url);
                 }
             }
@@ -915,7 +986,7 @@ async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
         "https://www.google.com/s2/favicons?domain={}&sz=64",
         host
     )) {
-        if seen.insert(google_s2.to_string()) {
+        if ensure_safe_outbound_url(&google_s2).await.is_ok() && seen.insert(google_s2.to_string()) {
             candidates.push(google_s2);
         }
     }

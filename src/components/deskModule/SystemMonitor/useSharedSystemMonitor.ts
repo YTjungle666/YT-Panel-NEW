@@ -3,11 +3,16 @@ import { getAll } from '@/api/system/systemMonitor'
 
 const monitorData = ref<any>(null)
 const loading = ref(false)
-let timer: ReturnType<typeof setInterval> | null = null
+let timer: ReturnType<typeof setTimeout> | null = null
 let subscribers = 0
 let currentInterval = 2000
+let inFlight = false
 
 async function refresh() {
+  if (inFlight)
+    return
+
+  inFlight = true
   loading.value = true
   try {
     const { data, code } = await getAll<any>()
@@ -15,8 +20,23 @@ async function refresh() {
       monitorData.value = data
   }
   finally {
+    inFlight = false
     loading.value = false
   }
+}
+
+function scheduleNext() {
+  if (subscribers <= 0)
+    return
+
+  timer = setTimeout(() => {
+    void tick()
+  }, currentInterval)
+}
+
+async function tick() {
+  await refresh()
+  scheduleNext()
 }
 
 function startPolling(interval: number) {
@@ -25,18 +45,15 @@ function startPolling(interval: number) {
     return
 
   if (timer)
-    clearInterval(timer)
+    clearTimeout(timer)
 
   currentInterval = normalized
-  void refresh()
-  timer = setInterval(() => {
-    void refresh()
-  }, normalized)
+  void tick()
 }
 
 function stopPolling() {
   if (timer) {
-    clearInterval(timer)
+    clearTimeout(timer)
     timer = null
   }
 }

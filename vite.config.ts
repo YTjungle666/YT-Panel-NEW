@@ -6,7 +6,6 @@ import { createSvgIconsPlugin } from 'vite-plugin-svg-icons'
 export default defineConfig(() => {
   const outDir = process.env.YT_PANEL_DIST_OUT_DIR || 'dist'
   const vendorChunkMatchers: Array<[string, string[]]> = [
-    ['naive-ui', ['/naive-ui/']],
     ['markdown', ['/markdown-it/', '/highlight.js/', '/katex/', '/@traptitech/markdown-it-katex/']],
     ['utils', ['/fuse.js/', '/dayjs/']],
     ['ui-libs', ['/@vueuse/']],

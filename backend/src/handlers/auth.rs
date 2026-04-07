@@ -1,17 +1,18 @@
 use std::net::IpAddr;
 
-use axum::{extract::State, http::HeaderMap, Json};
+use axum::{extract::State, http::HeaderMap, response::IntoResponse, Json};
 use bcrypt::hash;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
     auth::{
-        build_cleared_session_cookie, build_session_cookie, invalidate_cached_token,
-        random_token, request_is_https, request_token_value, validate_password_by_policy,
-        validate_register_email, validate_register_username, verify_password,
+        build_cleared_session_cookie, build_session_cookie, cache_authenticated_user,
+        invalidate_cached_token, random_token, request_is_https, request_token_value,
+        validate_password_by_policy, validate_register_email, validate_register_username,
+        verify_password,
     },
-    db::{get_setting, load_user_by_mail, load_user_by_username},
+    db::{get_setting, load_user_by_mail, load_user_by_username, set_setting},
     error::{ok, ok_empty, with_set_cookie, ApiError, ApiResult},
     models::{default_system_application_value, parse_register_config, AppState},
     utils::{extract_client_ip, is_private_ip},
@@ -42,19 +43,25 @@ pub struct LoginRequest {
     vcode: Option<String>,
 }
 
-pub async fn get_crypto_key(State(state): State<AppState>) -> Json<CryptoKeyResponse> {
+pub async fn get_crypto_key(State(state): State<AppState>) -> ApiResult {
     let key = if let Some(ref configured_key) = state.config.crypto_key {
         configured_key.clone()
     } else {
-        let today = chrono::Local::now().format("%Y%m%d").to_string();
-        let base_key = format!("yt-panel-key-{}", today);
-        format!("{:x}", md5::compute(&base_key))
+        match get_setting(&state.db, "public_crypto_key").await? {
+            Some(key) if !key.trim().is_empty() => key,
+            _ => {
+                let generated = random_token(64);
+                set_setting(&state.db, "public_crypto_key", &generated).await?;
+                generated
+            }
+        }
     };
-    Json(CryptoKeyResponse {
+    Ok(Json(CryptoKeyResponse {
         code: 200,
         msg: "success".to_string(),
         data: Some(key),
     })
+    .into_response())
 }
 
 pub async fn register_commit(
@@ -93,16 +100,14 @@ pub async fn register_commit(
         return Err(ApiError::new(1401, "The email already exists"));
     }
 
-    let password_hash = hash(password, 12).map_err(|e| ApiError::new(-1, e.to_string()))?;
-    let token = random_token(48);
+    let password_hash = hash(password, 12).map_err(|e| ApiError::internal(e.to_string()))?;
     let result = sqlx::query(
-        "INSERT INTO user (username, password, name, status, role, mail, token, created_at, updated_at) VALUES (?, ?, ?, 1, 2, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        "INSERT INTO user (username, password, name, status, role, mail, token, created_at, updated_at) VALUES (?, ?, ?, 1, 2, ?, '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
     )
     .bind(username)
     .bind(password_hash)
     .bind(username)
     .bind(&email)
-    .bind(token)
     .execute(&state.db)
     .await
     .map_err(|e| ApiError::db(e.to_string()))?;
@@ -133,26 +138,19 @@ pub async fn login(
         return Err(ApiError::new(1004, "Account disabled or not activated"));
     }
 
-    let persistent_token = if let Some(token) = user.token.clone().filter(|s| !s.is_empty()) {
-        token
-    } else {
-        let token = random_token(48);
-        sqlx::query("UPDATE user SET token = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-            .bind(&token)
-            .bind(user.id)
-            .execute(&state.db)
-            .await
-            .map_err(|e| ApiError::db(e.to_string()))?;
-        token
-    };
+    let previous_token = user.token.clone().filter(|value| !value.is_empty());
+    let persistent_token = random_token(48);
+    sqlx::query("UPDATE user SET token = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(&persistent_token)
+        .bind(user.id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| ApiError::db(e.to_string()))?;
+    invalidate_cached_token(&state, previous_token.as_deref()).await;
 
     let mut authenticated_user = user.clone();
     authenticated_user.token = Some(persistent_token.clone());
-    state
-        .auth_cache
-        .write()
-        .await
-        .insert(persistent_token.clone(), authenticated_user.clone());
+    cache_authenticated_user(&state, &persistent_token, authenticated_user.clone()).await;
 
     let response = ok(json!({
         "id": authenticated_user.id,
@@ -162,6 +160,7 @@ pub async fn login(
         "headImage": authenticated_user.head_image,
         "role": authenticated_user.role,
         "mail": authenticated_user.mail,
+        "mustChangePassword": authenticated_user.must_change_password == 1,
     }));
 
     with_set_cookie(

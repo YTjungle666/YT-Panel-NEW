@@ -1,5 +1,8 @@
-FROM alpine:3.23
+# syntax=docker/dockerfile:1.7
 
+ARG RUNTIME_IMAGE=alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+
+FROM ${RUNTIME_IMAGE} AS runtime
 WORKDIR /app
 
 LABEL org.opencontainers.image.title="YT-Panel-NEW" \
@@ -13,13 +16,21 @@ RUN apk add --no-cache ca-certificates \
 ENV YT_PANEL_CONFIG=/app/conf/app.toml
 
 COPY LICENSE /app/LICENSE
+COPY backend/config/docker.toml /app/conf/app.toml
 COPY dist /app/web
 COPY backend/target/x86_64-unknown-linux-musl/release/yt-panel-rust-backend /app/yt-panel
-COPY scripts/ct-entrypoint.sh /app/ct-entrypoint.sh
-COPY backend/config/docker.toml /app/conf/app.toml
 
-RUN chmod +x /app/ct-entrypoint.sh
+RUN chmod 0755 /app/yt-panel
 
 EXPOSE 80
 
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/ping >/dev/null 2>&1 || exit 1
+
 CMD ["/app/yt-panel"]
+
+FROM runtime AS ct-template
+USER root
+RUN rm -f /sbin/init
+COPY scripts/ct-entrypoint.sh /sbin/init
+RUN chmod 0755 /sbin/init

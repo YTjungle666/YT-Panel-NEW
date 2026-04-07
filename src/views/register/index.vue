@@ -87,6 +87,7 @@ import { router } from '@/router'
 import { t } from '@/locales'
 import { SvgIcon } from '@/components/common'
 import type { FormInst } from 'naive-ui'
+import { logError } from '@/utils/logger'
 
 const formRef = ref<FormInst | null>(null)
 const message = useMessage()
@@ -262,7 +263,7 @@ const handleRegister = async () => {
       updateAttemptCount()
     }
   } catch (error: any) {
-    console.error('注册失败:', error)
+    logError('注册失败', error)
     message.error(error?.message || t('register.registerFailed'))
     // 注册失败，更新尝试计数
     updateAttemptCount()

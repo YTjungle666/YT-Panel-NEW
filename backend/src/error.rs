@@ -5,18 +5,25 @@ use axum::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct ApiError {
     pub code: i32,
     pub msg: String,
+    pub status: StatusCode,
 }
 
 impl ApiError {
     pub fn new(code: i32, msg: impl Into<String>) -> Self {
+        Self::new_with_status(code, msg, status_from_code(code))
+    }
+
+    pub fn new_with_status(code: i32, msg: impl Into<String>, status: StatusCode) -> Self {
         Self {
             code,
             msg: msg.into(),
+            status,
         }
     }
 
@@ -40,11 +47,19 @@ impl ApiError {
     }
 
     pub fn db(err: impl Into<String>) -> Self {
-        Self::new(1200, format!("Database error[{}]", err.into()))
+        let err = err.into();
+        error!("database error: {}", err);
+        Self::new_with_status(1200, "Database error", StatusCode::INTERNAL_SERVER_ERROR)
     }
 
     pub fn internal(msg: impl Into<String>) -> Self {
-        Self::new(1500, msg)
+        let msg = msg.into();
+        error!("internal error: {}", msg);
+        Self::new_with_status(1500, "Internal server error", StatusCode::INTERNAL_SERVER_ERROR)
+    }
+
+    pub fn password_change_required() -> Self {
+        Self::new_with_status(1108, "PASSWORD_CHANGE_REQUIRED", StatusCode::FORBIDDEN)
     }
 }
 
@@ -55,7 +70,17 @@ impl IntoResponse for ApiError {
             msg: self.msg,
             data: None,
         };
-        (StatusCode::OK, Json(envelope)).into_response()
+        (self.status, Json(envelope)).into_response()
+    }
+}
+
+fn status_from_code(code: i32) -> StatusCode {
+    match code {
+        1000 | 1001 | 1003 | 1100 => StatusCode::UNAUTHORIZED,
+        1004 | 1005 | 1103 | 1108 | 1403 => StatusCode::FORBIDDEN,
+        1006 | 1104 => StatusCode::NOT_FOUND,
+        1200 | 1500 => StatusCode::INTERNAL_SERVER_ERROR,
+        _ => StatusCode::BAD_REQUEST,
     }
 }
 

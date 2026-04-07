@@ -1,5 +1,6 @@
 import { h } from 'vue'
 import { SvgIconOnline } from '@/components/common'
+import { logWarn } from '@/utils/logger'
 
 export const useIconRender = () => {
   interface IconConfig {
@@ -25,7 +26,7 @@ export const useIconRender = () => {
       style.fontSize = `${fontSize}px`
 
     if (!icon)
-      window.console.warn('iconRender: icon is required')
+      logWarn('iconRender: icon is required')
 
     return () => h(SvgIconOnline, { icon, style })
   }

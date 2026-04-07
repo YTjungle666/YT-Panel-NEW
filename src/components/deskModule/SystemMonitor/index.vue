@@ -133,7 +133,6 @@ function getDropdownMenuOptions() {
 }
 
 function onClickoutside() {
-  // message.info('clickoutside')
   dropdownShow.value = false
 }
 

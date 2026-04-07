@@ -64,6 +64,10 @@ const authStore = useAuthStore()
 
 // 过滤菜单项 - 只显示有权限的菜单
 const filteredApps = computed(() => {
+  if (authStore.userInfo?.mustChangePassword) {
+    return apps.value.filter(app => app.componentName === 'UserInfo')
+  }
+
   return apps.value.filter(app => {
     // 如果没有auth属性或auth为0，所有人都可见
     if (!app.auth || app.auth === 0) {

@@ -6,14 +6,6 @@ import { useLanguage } from '@/hooks/useLanguage'
 
 const { theme, themeOverrides } = useTheme()
 const { language } = useLanguage()
-
-// 移除一言脚本加载，避免没有hitokoto元素时的错误
-// onMounted(() => {
-//   const script = document.createElement('script')
-//   script.src = 'https://v1.hitokoto.cn/?encode=js&select=%23hitokoto'
-//   script.defer = true
-//   document.body.appendChild(script)
-// })
 </script>
 
 <template>

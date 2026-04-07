@@ -57,12 +57,6 @@ const rules: FormRules = {
     type: 'number',
     message: t('adminSettingUsers.formRules.roleRequired'),
   },
-  // status: {
-  //   required: true,
-  //   trigger: 'blur',
-  //   type: 'number',
-  //   message: '请选择账号状态',
-  // },
   password: {
     trigger: 'blur',
     min: 6,

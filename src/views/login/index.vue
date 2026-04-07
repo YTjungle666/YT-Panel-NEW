@@ -10,8 +10,10 @@ import { t } from '@/locales'
 import { VisitMode } from '@/enums/auth'
 import { languageOptions } from '@/utils/defaultData'
 import type { Language } from '@/store/modules/app/helper'
-import { ss } from '@/utils/storage'
+import { clearAppScopedStorage } from '@/store/modules/auth/helper'
 import { getList as getGroupList } from '@/api/panel/itemIconGroup'
+import { ss } from '@/utils/storage/local'
+import { logError } from '@/utils/logger'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -38,7 +40,7 @@ const loadLoginConfig = async () => {
       : !!registerConfig?.openRegister
   }
   catch (error) {
-    console.error('获取登录配置失败:', error)
+    logError('获取登录配置失败', error)
   }
 }
 
@@ -47,26 +49,21 @@ const loginPost = async () => {
   try {
     const res = await login<Login.LoginResponse>(form.value)
     if (res.code === 0) {
-      ss.remove('USER_AUTH_INFO_CACHE')
-      ss.remove('USER_CONFIG_CACHE')
-      ss.remove(GROUP_LIST_CACHE_KEY)
-      ss.remove('bookmarksTreeCache')
-      ss.remove('searchEngineListCache')
-
-      const localKeys = [...Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))]
-      for (const key of localKeys) {
-        if (key && (key.startsWith('moduleConfig_') || key.startsWith('ITEM_ICON_LIST_CACHE_')))
-          ss.remove(key)
-      }
+      clearAppScopedStorage()
 
       authStore.setUserInfo(res.data)
       authStore.setVisitMode(VisitMode.VISIT_MODE_LOGIN)
 
-      const groupListRes = await getGroupList() as any
-      if (groupListRes.code === 0 && groupListRes.data)
-        ss.set(GROUP_LIST_CACHE_KEY, groupListRes.data.list || [])
+      if (!res.data.mustChangePassword) {
+        const groupListRes = await getGroupList() as any
+        if (groupListRes.code === 0 && groupListRes.data)
+          ss.set(GROUP_LIST_CACHE_KEY, groupListRes.data.list || [])
+      }
 
-      ms.success(`Hi ${res.data.name},${t('login.welcomeMessage')}`)
+      if (res.data.mustChangePassword)
+        ms.warning('首次登录必须先修改密码')
+      else
+        ms.success(`Hi ${res.data.name},${t('login.welcomeMessage')}`)
       router.push({ path: '/home' })
       return
     }

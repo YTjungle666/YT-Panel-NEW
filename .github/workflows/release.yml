@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22.22.1'
   RUST_VERSION: '1.85.1'
   RUST_TARGET: 'x86_64-unknown-linux-musl'
 
@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -39,13 +39,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ env.RUST_TARGET }}
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             ~/.cargo/registry
@@ -57,44 +57,55 @@ jobs:
         working-directory: backend
         run: cargo build --release --target ${{ env.RUST_TARGET }}
 
-      - name: Build Docker image
-        run: docker build -t yt-panel-release:${{ github.ref_name }} .
+      - name: Build CT export image
+        run: docker build --target ct-template -t yt-panel-release:${{ github.ref_name }}-ct .
 
       - name: Install zstd
         run: sudo apt-get install -y zstd
 
       - name: Export PVE CT template
-        run: ./scripts/export-pve-template.sh yt-panel-release:${{ github.ref_name }} yt-panel-alpine-ct-template.tar.zst
+        run: ./scripts/export-pve-template.sh yt-panel-release:${{ github.ref_name }}-ct yt-panel-alpine-ct-template.tar.zst
 
       - name: Prepare release files
+        run: ./scripts/prepare-release-files.sh release-out backend/target/${{ env.RUST_TARGET }}/release/yt-panel-rust-backend dist backend/config/docker.toml
+
+      - name: Write release notes
         run: |
-          mkdir -p release-out/yt-panel-linux-amd64/conf release-out/yt-panel-linux-amd64/web
-          cp backend/target/${{ env.RUST_TARGET }}/release/yt-panel-rust-backend release-out/yt-panel-linux-amd64/yt-panel
-          cp LICENSE release-out/yt-panel-linux-amd64/LICENSE
-          cp -r dist/. release-out/yt-panel-linux-amd64/web/
-          cp backend/config/docker.toml release-out/yt-panel-linux-amd64/conf/app.toml
-          tar -czf yt-panel-linux-amd64.tar.gz -C release-out yt-panel-linux-amd64
+          cat > release-notes.md <<'EOF'
+          ## Changes
+          - Alpine Docker image
+          - Linux AMD64 release package
+          - PVE-ready Alpine CT template
+          - License unified to PolyForm-Noncommercial-1.0.0
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            yt-panel-linux-amd64.tar.gz
-            yt-panel-alpine-ct-template.tar.zst
-          name: Release ${{ github.ref_name }}
-          body: |
-            ## Changes
-            - Alpine Docker image
-            - Linux AMD64 release package
-            - PVE-ready Alpine CT template
-            - License unified to PolyForm-Noncommercial-1.0.0
+          ## Docker
+          ```bash
+          docker pull ghcr.io/${{ github.repository_owner }}/yt-panel-new:latest
+          ```
 
-            ## Docker
-            ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/yt-panel-new:latest
-            ```
+          ## License
+          These release assets are distributed under PolyForm-Noncommercial-1.0.0 and are not licensed for commercial use.
+          EOF
 
-            ## License
-            These release assets are distributed under PolyForm-Noncommercial-1.0.0 and are not licensed for commercial use.
+      - name: Create or update release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          title="Release ${tag}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "$title" --notes-file release-notes.md --latest
+          else
+            gh release create "$tag" \
+              release-out/yt-panel-linux-amd64.tar.gz \
+              yt-panel-alpine-ct-template.tar.zst \
+              --title "$title" \
+              --notes-file release-notes.md \
+              --latest
+          fi
+
+          gh release upload "$tag" \
+            release-out/yt-panel-linux-amd64.tar.gz \
+            yt-panel-alpine-ct-template.tar.zst \
+            --clobber

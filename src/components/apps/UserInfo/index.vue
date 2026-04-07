@@ -10,9 +10,7 @@ import { RoundCardModal, SvgIcon } from '@/components/common/'
 import { updateInfo, updatePassword } from '@/api/system/user'
 import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
-import { ss } from '@/utils/storage'
-
-const USER_AUTH_INFO_CACHE_KEY = 'USER_AUTH_INFO_CACHE'
+import { clearAppScopedStorage } from '@/store/modules/auth/helper'
 const userStore = useUserStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -45,9 +43,7 @@ const updatePasswordModalFormRules: FormRules = {
   oldPassword: {
     required: true,
     trigger: 'blur',
-    min: 8,
-    max: 64,
-    message: t('settingUserInfo.passwordLimit'),
+    message: t('common.inputPlaceholder'),
   },
   password: {
     required: true,
@@ -71,8 +67,7 @@ async function logoutApi() {
   authStore.removeToken()
   panelState.removeState()
   appStore.removeToken()
-  window.localStorage.clear()
-  window.sessionStorage.clear()
+  clearAppScopedStorage()
   ms.success(t('settingUserInfo.logoutSuccess'))
   location.reload()
 }
@@ -80,7 +75,6 @@ async function logoutApi() {
 function handleSaveInfo() {
   updateInfo(nickName.value).then(({ code, msg }) => {
     if (code === 0) {
-      ss.remove(USER_AUTH_INFO_CACHE_KEY)
       updateLocalUserInfo()
       isEditNickNameStatus.value = false
     }
@@ -99,7 +93,6 @@ function resetPasswordForm() {
 }
 
 async function refreshUserAuthInfo() {
-  ss.remove(USER_AUTH_INFO_CACHE_KEY)
   const authInfo = await updateLocalUserInfo()
   if (authInfo?.user) {
     authStore.setUserInfo(authInfo.user)
@@ -125,10 +118,8 @@ function handleUpdatePassword(e: MouseEvent) {
       if (code === 0) {
         updatePasswordModalState.value.show = false
         resetPasswordForm()
-        ss.remove(USER_AUTH_INFO_CACHE_KEY)
         await refreshUserAuthInfo()
-        ms.success(t('settingUserInfo.passwordUpdatedRelogin'))
-        await logoutApi()
+        ms.success(t('settingUserInfo.passwordUpdateSuccess'))
       }
       else {
         ms.error(msg || t('common.failed'))

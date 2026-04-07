@@ -16,8 +16,9 @@ pub async fn load_config() -> anyhow::Result<AppConfig> {
 
     for path in candidates {
         if path.exists() {
-            let content = tokio::fs::read_to_string(path).await?;
-            return Ok(toml::from_str(&content).unwrap_or_default());
+            let content = tokio::fs::read_to_string(&path).await?;
+            return toml::from_str(&content)
+                .map_err(|err| anyhow::anyhow!("failed to parse config {}: {}", path.display(), err));
         }
     }
 

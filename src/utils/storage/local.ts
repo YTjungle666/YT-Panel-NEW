@@ -66,3 +66,26 @@ export function createLocalStorage(options?: { expire?: number | null; crypto?: 
 export const ls = createLocalStorage()
 
 export const ss = createLocalStorage({ expire: null, crypto: false })
+
+function removeKeysFromStorage(storage: Storage, keys: string[]) {
+  for (const key of keys)
+    storage.removeItem(key)
+}
+
+function removeByPrefixesFromStorage(storage: Storage, prefixes: string[]) {
+  const keys = [...Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(Boolean)] as string[]
+  for (const key of keys) {
+    if (prefixes.some(prefix => key.startsWith(prefix)))
+      storage.removeItem(key)
+  }
+}
+
+export function removeScopedStorage(keys: string[], prefixes: string[] = []) {
+  removeKeysFromStorage(window.localStorage, keys)
+  removeKeysFromStorage(window.sessionStorage, keys)
+
+  if (prefixes.length > 0) {
+    removeByPrefixesFromStorage(window.localStorage, prefixes)
+    removeByPrefixesFromStorage(window.sessionStorage, prefixes)
+  }
+}

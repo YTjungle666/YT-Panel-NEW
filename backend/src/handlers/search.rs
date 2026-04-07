@@ -1,6 +1,6 @@
 use axum::{extract::{Query, State}, http::HeaderMap};
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use sqlx::{QueryBuilder, Row, Sqlite};
 
 use crate::{
     auth::authenticate,
@@ -54,45 +54,40 @@ pub async fn search_bookmarks(
         .map(|s| format!("%{}%", s))
         .collect();
 
-    let mut sql = String::from(
+    let mut builder = QueryBuilder::<Sqlite>::new(
         "SELECT id, title, url, lan_url, icon, sort, is_folder, parent_id, \
-         CASE WHEN LOWER(title) LIKE LOWER(?) THEN 1.0 \
-              WHEN LOWER(url) LIKE LOWER(?) THEN 0.8 \
-              ELSE 0.5 END as score \
-         FROM bookmark WHERE user_id = ?",
+         CASE WHEN LOWER(title) LIKE LOWER(",
     );
+    builder.push_bind(&score_pattern);
+    builder.push(") THEN 1.0 WHEN LOWER(url) LIKE LOWER(");
+    builder.push_bind(&score_pattern);
+    builder.push(") THEN 0.8 ELSE 0.5 END as score FROM bookmark WHERE user_id = ");
+    builder.push_bind(user_id);
 
-    let mut conditions = vec![];
-    for _ in 0..patterns.len() {
-        if req.search_url {
-            conditions.push("(LOWER(title) LIKE LOWER(?) OR LOWER(url) LIKE LOWER(?))".to_string());
-        } else {
-            conditions.push("LOWER(title) LIKE LOWER(?)".to_string());
+    if !patterns.is_empty() {
+        builder.push(" AND (");
+        let mut separated = builder.separated(" OR ");
+        for pattern in &patterns {
+            if req.search_url {
+                separated.push("(LOWER(title) LIKE LOWER(");
+                separated.push_bind(pattern);
+                separated.push(") OR LOWER(url) LIKE LOWER(");
+                separated.push_bind(pattern);
+                separated.push("))");
+            } else {
+                separated.push("LOWER(title) LIKE LOWER(");
+                separated.push_bind(pattern);
+                separated.push(")");
+            }
         }
+        builder.push(")");
     }
 
-    if !conditions.is_empty() {
-        sql.push_str(" AND (");
-        sql.push_str(&conditions.join(" OR "));
-        sql.push(')');
-    }
-    sql.push_str(" ORDER BY score DESC, sort ASC LIMIT ?");
+    builder.push(" ORDER BY score DESC, sort ASC LIMIT ");
+    builder.push_bind(limit);
 
-    let mut query_builder = sqlx::query(&sql)
-        .bind(&score_pattern)
-        .bind(&score_pattern)
-        .bind(user_id);
-
-    for pattern in &patterns {
-        if req.search_url {
-            query_builder = query_builder.bind(pattern).bind(pattern);
-        } else {
-            query_builder = query_builder.bind(pattern);
-        }
-    }
-    query_builder = query_builder.bind(limit);
-
-    let rows = query_builder
+    let rows = builder
+        .build()
         .fetch_all(&state.db)
         .await
         .map_err(|_| ApiError::new(1200, "Database error"))?;
@@ -142,7 +137,7 @@ pub async fn search_suggestions(
     .bind(&pattern)
     .fetch_all(&state.db)
     .await
-    .map_err(|e| ApiError::new(1200, format!("Database error[{}]", e)))?;
+    .map_err(|e| ApiError::db(e.to_string()))?;
 
     Ok(ok(suggestions))
 }

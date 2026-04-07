@@ -4,12 +4,9 @@ import type { NotificationReactive } from 'naive-ui'
 import { NButton, createDiscreteApi } from 'naive-ui'
 import { useAuthStore, useNoticeStore, useUserStore } from '@/store'
 import { getAuthInfo } from '@/api/system/user'
-import { ss } from '@/utils/storage'
-
-// 用户认证信息缓存键
-const USER_AUTH_INFO_CACHE_KEY = 'USER_AUTH_INFO_CACHE'
 import type { VisitMode } from '@/enums/auth'
 import { getListByDisplayType as getListByDisplayTypeApi } from '@/api/notice'
+import { logError } from '@/utils/logger'
 
 const noticeStore = useNoticeStore()
 const userStore = useUserStore()
@@ -111,36 +108,15 @@ export async function updateLocalUserInfo() {
   }
 
   try {
-    // 1. 首先尝试从缓存读取数据
-    const cachedData = ss.get(USER_AUTH_INFO_CACHE_KEY)
-    if (cachedData) {
-      userStore.updateUserInfo({ headImage: cachedData.user.headImage, name: cachedData.user.name })
-      authStore.setUserInfo(cachedData.user)
-      authStore.setVisitMode(cachedData.visitMode)
-      return cachedData
-    }
-
-    // 2. 缓存中没有数据，请求接口获取数据
     const { data } = await getAuthInfo<Req>()
 
-    // 更新store
     userStore.updateUserInfo({ headImage: data.user.headImage, name: data.user.name })
     authStore.setUserInfo(data.user)
     authStore.setVisitMode(data.visitMode)
-
-    // 3. 将数据永久保存到缓存中
-    ss.set(USER_AUTH_INFO_CACHE_KEY, data)
     return data
   } catch (error) {
-    console.error('获取用户认证信息失败', error)
-    // 出错时尝试从缓存获取
-    const cachedData = ss.get(USER_AUTH_INFO_CACHE_KEY)
-    if (cachedData) {
-      userStore.updateUserInfo({ headImage: cachedData.user.headImage, name: cachedData.user.name })
-      authStore.setUserInfo(cachedData.user)
-      authStore.setVisitMode(cachedData.visitMode)
-      return cachedData
-    }
+    logError('获取用户认证信息失败', error)
+    authStore.removeToken()
   }
 }
 
@@ -198,7 +174,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       return true
     }
     catch (err) {
-      console.error('copy fail', err)
+      logError('copy fail', err)
       return false
     }
   }
@@ -214,7 +190,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       return true
     }
     catch (err) {
-      console.error('copy fail', err)
+      logError('copy fail', err)
       return false
     }
     finally {
