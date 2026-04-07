@@ -10,7 +10,6 @@ import { ss } from '@/utils/storage/local'
 
 function clearGroupCaches() {
   ss.remove('groupListCache')
-  // 清除所有图标列表缓存
   Object.keys(localStorage).forEach(key => {
     if (key.startsWith('itemIconList_'))
       ss.remove(key)
@@ -119,10 +118,11 @@ function handleSaveGroup() {
   formRef.value?.validate((errors) => {
     if (!errors) {
       edit(editModalArg.value.model).then(({ code, msg }) => {
-        if (code !== 0)
+        if (code !== 0) {
           ms.error(msg)
-        
-        // 清除分组列表缓存
+          return
+        }
+
         clearGroupCaches()
         refreshList()
         editModalArg.value.show = false
@@ -170,10 +170,9 @@ onMounted(() => {
           <NCard size="small" style="border-radius:10px;margin-bottom: 10px;">
             <div class="flex" :class="sortStatus ? 'cursor-move' : ''">
               <div class="flex items-center">
-                <span class="mr-[10px]">
-                  <SvgIcon class="text-[20px]" icon="material-symbols:ad-group-outline-rounded" />
-                  <!-- <SvgIcon class="text-[20px]" :icon="item.icon" /> -->
-                </span>
+	                <span class="mr-[10px]">
+	                  <SvgIcon class="text-[20px]" icon="material-symbols:ad-group-outline-rounded" />
+	                </span>
                 <span>
                   {{ item.title }}
                 </span>
@@ -205,11 +204,7 @@ onMounted(() => {
         <NFormItem path="title" :label="$t('apps.itemGroupManage.groupName')">
           <NInput v-model:value="editModalArg.model.title" type="text" :maxlength="20" show-count />
         </NFormItem>
-
-        <!-- <NFormItem path="name" label="昵称">
-          <NInput v-model:value="editModalArg.model" type="text" placeholder="请输入昵称" />
-        </NFormItem> -->
-      </NForm>
+	      </NForm>
       <template #footer>
         <NButton type="success" size="small" class="float-right" @click="handleSaveGroup">
           {{ $t('common.confirm') }}

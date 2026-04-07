@@ -158,7 +158,38 @@ function handleChangeTheme(value: Theme) {
 
 <template>
   <div class="bg-slate-200 dark:bg-zinc-900 p-2 h-full">
-    <NCard style="border-radius:10px" size="small">
+    <template v-if="isForcePasswordChange">
+      <NCard style="border-radius:10px" size="small">
+        <NAlert type="warning" class="mb-4">
+          {{ $t('settingUserInfo.forceChangePasswordNotice') }}
+        </NAlert>
+        <NForm ref="formRef" :model="updatePasswordModalState.form" :rules="updatePasswordModalFormRules">
+          <NFormItem path="oldPassword" :label="$t('settingUserInfo.oldPassword')">
+            <NInput v-model:value="updatePasswordModalState.form.oldPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.oldPassword')" />
+          </NFormItem>
+
+          <NFormItem path="password" :label="$t('settingUserInfo.newPassword')">
+            <NInput v-model:value="updatePasswordModalState.form.password" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
+          </NFormItem>
+
+          <NFormItem path="confirmPassword" :label="$t('settingUserInfo.confirmPassword')">
+            <NInput v-model:value="updatePasswordModalState.form.confirmPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.confirmPassword')" />
+          </NFormItem>
+        </NForm>
+        <NDivider style="margin: 10px 0;" dashed />
+        <div class="flex justify-end gap-2">
+          <NButton size="small" type="error" secondary @click="handleLogout">
+            {{ $t('settingUserInfo.logout') }}
+          </NButton>
+          <NButton type="success" size="small" :loading="updatePasswordModalState.loading" @click="handleUpdatePassword">
+            {{ $t('common.save') }}
+          </NButton>
+        </div>
+      </NCard>
+    </template>
+
+    <template v-else>
+      <NCard style="border-radius:10px" size="small">
       <div>
         <div class="text-slate-500 font-bold">
           {{ $t('common.username') }}
@@ -216,21 +247,19 @@ function handleChangeTheme(value: Theme) {
           {{ $t('settingUserInfo.updatePassword') }}
         </NButton>
       </div>
-    </NCard>
+      </NCard>
 
-    <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <NButton size="small" text type="error" @click="handleLogout">
-        <template #icon>
-          <SvgIcon icon="tabler:logout" />
-        </template>
-        {{ $t('settingUserInfo.logout') }}
-      </NButton>
-    </NCard>
+      <NCard style="border-radius:10px" class="mt-[10px]" size="small">
+        <NButton size="small" text type="error" @click="handleLogout">
+          <template #icon>
+            <SvgIcon icon="tabler:logout" />
+          </template>
+          {{ $t('settingUserInfo.logout') }}
+        </NButton>
+      </NCard>
+    </template>
 
-    <RoundCardModal v-model:show="updatePasswordModalState.show" size="small" preset="card" style="width: 420px" :mask-closable="!isForcePasswordChange" :closable="!isForcePasswordChange" :title="$t('settingUserInfo.updatePassword')">
-      <NAlert v-if="isForcePasswordChange" type="warning" class="mb-4">
-        {{ $t('settingUserInfo.forceChangePasswordNotice') }}
-      </NAlert>
+    <RoundCardModal v-if="!isForcePasswordChange" v-model:show="updatePasswordModalState.show" size="small" preset="card" style="width: 420px" :mask-closable="true" :closable="true" :title="$t('settingUserInfo.updatePassword')">
       <NForm ref="formRef" :model="updatePasswordModalState.form" :rules="updatePasswordModalFormRules">
         <NFormItem path="oldPassword" :label="$t('settingUserInfo.oldPassword')">
           <NInput v-model:value="updatePasswordModalState.form.oldPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.oldPassword')" />

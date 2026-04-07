@@ -88,33 +88,20 @@ pub fn resolve_uploaded_file_path(uploads_dir: &str, stored_src: &str) -> Option
         return None;
     }
 
-    let direct = Path::new(normalized);
-    if direct.is_absolute() {
-        return Some(direct.to_path_buf());
+    let suffix = ["./uploads/", "/uploads/", "uploads/"]
+        .iter()
+        .find_map(|prefix| normalized.strip_prefix(prefix))?;
+    let relative = Path::new(suffix);
+    if relative.components().any(|component| {
+        matches!(
+            component,
+            Component::RootDir | Component::ParentDir | Component::Prefix(_)
+        )
+    }) {
+        return None;
     }
 
-    for prefix in ["./uploads/", "/uploads/", "uploads/"] {
-        if let Some(suffix) = normalized.strip_prefix(prefix) {
-            return Some(Path::new(uploads_dir).join(suffix));
-        }
-    }
-
-    let trimmed = normalized.trim_start_matches("./");
-    if !trimmed.is_empty() {
-        let as_absolute = Path::new("/").join(trimmed);
-        if as_absolute.is_absolute()
-            && as_absolute.components().next() == Some(Component::RootDir)
-        {
-            return Some(as_absolute);
-        }
-
-        let as_relative = PathBuf::from(trimmed);
-        if as_relative.exists() {
-            return Some(as_relative);
-        }
-    }
-
-    None
+    Some(Path::new(uploads_dir).join(relative))
 }
 
 pub fn max_upload_bytes(config: &AppConfig) -> u64 {

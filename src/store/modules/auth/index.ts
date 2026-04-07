@@ -3,13 +3,11 @@ import { getStorage, removeToken as hRemoveToken, setStorage } from './helper'
 import { VisitMode } from '@/enums/auth'
 
 export interface AuthState {
-  token: string | null
   userInfo: User.Info | null
   visitMode: VisitMode
 }
 
 const defaultState: AuthState = {
-  token: null,
   userInfo: null,
   visitMode: VisitMode.VISIT_MODE_LOGIN,
 }
@@ -18,11 +16,6 @@ export const useAuthStore = defineStore('auth-store', {
   state: (): AuthState => getStorage() ?? { ...defaultState },
 
   actions: {
-    setToken(token: string) {
-      this.token = token
-      this.saveStorage()
-    },
-
     setUserInfo(userInfo: User.Info) {
       this.userInfo = userInfo
       this.saveStorage()

@@ -51,15 +51,10 @@ export function createLocalStorage(options?: { expire?: number | null; crypto?: 
     window.localStorage.removeItem(key)
   }
 
-  function clear() {
-    window.localStorage.clear()
-  }
-
   return {
     set,
     get,
     remove,
-    clear,
   }
 }
 

@@ -553,6 +553,10 @@ fn build_favicon_client() -> Result<reqwest::Client, ApiError> {
         .map_err(|e| ApiError::new(-1, e.to_string()))
 }
 
+const MAX_FAVICON_HTML_BYTES: usize = 512 * 1024;
+const MAX_FAVICON_MANIFEST_BYTES: usize = 256 * 1024;
+const MAX_FAVICON_IMAGE_BYTES: usize = 512 * 1024;
+
 fn is_blocked_outbound_hostname(host: &str) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     matches!(
@@ -824,7 +828,9 @@ async fn fetch_html_document(client: &reqwest::Client, url: &Url) -> Result<Opti
         return Ok(None);
     }
 
-    let text = resp.text().await.map_err(|e| ApiError::new(-1, e.to_string()))?;
+    let Some(text) = read_response_text_limited(resp, MAX_FAVICON_HTML_BYTES).await? else {
+        return Ok(None);
+    };
     if text.trim().is_empty() {
         return Ok(None);
     }
@@ -858,7 +864,9 @@ async fn fetch_manifest_document(
         return Ok(None);
     }
 
-    let text = resp.text().await.map_err(|e| ApiError::new(-1, e.to_string()))?;
+    let Some(text) = read_response_text_limited(resp, MAX_FAVICON_MANIFEST_BYTES).await? else {
+        return Ok(None);
+    };
     if text.trim().is_empty() {
         return Ok(None);
     }
@@ -913,12 +921,55 @@ async fn fetch_favicon_data_url(
         return Ok(None);
     };
 
-    let bytes = resp.bytes().await.map_err(|e| ApiError::new(-1, e.to_string()))?;
+    if mime.eq_ignore_ascii_case("image/svg+xml") {
+        return Ok(None);
+    }
+
+    let Some(bytes) = read_response_bytes_limited(resp, MAX_FAVICON_IMAGE_BYTES).await? else {
+        return Ok(None);
+    };
     if bytes.is_empty() {
         return Ok(None);
     }
 
     Ok(Some(format!("data:{};base64,{}", mime, B64.encode(bytes))))
+}
+
+async fn read_response_bytes_limited(
+    mut resp: reqwest::Response,
+    max_bytes: usize,
+) -> Result<Option<Vec<u8>>, ApiError> {
+    if resp
+        .content_length()
+        .map(|length| length > max_bytes as u64)
+        .unwrap_or(false)
+    {
+        return Ok(None);
+    }
+
+    let mut buffer = Vec::<u8>::new();
+    while let Some(chunk) = resp
+        .chunk()
+        .await
+        .map_err(|e| ApiError::new(-1, e.to_string()))?
+    {
+        if buffer.len() + chunk.len() > max_bytes {
+            return Ok(None);
+        }
+        buffer.extend_from_slice(&chunk);
+    }
+
+    Ok(Some(buffer))
+}
+
+async fn read_response_text_limited(
+    resp: reqwest::Response,
+    max_bytes: usize,
+) -> Result<Option<String>, ApiError> {
+    let Some(bytes) = read_response_bytes_limited(resp, max_bytes).await? else {
+        return Ok(None);
+    };
+    Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
 }
 
 async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {

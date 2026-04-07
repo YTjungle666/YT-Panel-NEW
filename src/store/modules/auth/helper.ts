@@ -1,9 +1,7 @@
 import type { AuthState } from './index'
 import { removeScopedStorage } from '@/utils/storage'
 
-const LOCAL_NAME = 'AUTH_TOKEN'
 const APP_STORAGE_KEYS = [
-  LOCAL_NAME,
   'USER_AUTH_INFO_CACHE',
   'USER_CONFIG_CACHE',
   'groupListCache',

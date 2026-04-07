@@ -65,7 +65,11 @@ const authStore = useAuthStore()
 // 过滤菜单项 - 只显示有权限的菜单
 const filteredApps = computed(() => {
   if (authStore.userInfo?.mustChangePassword) {
-    return apps.value.filter(app => app.componentName === 'UserInfo')
+    return [{
+      name: t('settingUserInfo.updatePassword'),
+      componentName: 'UserInfo',
+      icon: 'mdi:password-outline',
+    }]
   }
 
   return apps.value.filter(app => {
@@ -108,6 +112,9 @@ function handleResize() {
 }
 
 onMounted(() => {
+  if (authStore.userInfo?.mustChangePassword)
+    componentName.value = 'UserInfo'
+
   const adminApp: App = {
     name: t('adminSettingUsers.appName'),
     componentName: 'Users',

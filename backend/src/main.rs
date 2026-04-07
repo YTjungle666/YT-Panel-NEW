@@ -1,11 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
+    extract::Request,
     http::{
-        header::{AUTHORIZATION, CONTENT_TYPE},
+        header::{AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_TYPE},
         HeaderName, HeaderValue, Method,
     },
-    middleware,
+    middleware::{self, Next},
+    response::Response,
     routing::{get, post},
     Router,
 };
@@ -24,6 +26,40 @@ use yt_panel_rust_backend::{
     },
     models::{AppConfig, AppState},
 };
+
+fn should_force_attachment_for_upload(path: &str) -> bool {
+    let normalized = path.to_ascii_lowercase();
+    normalized.ends_with(".html")
+        || normalized.ends_with(".htm")
+        || normalized.ends_with(".xhtml")
+        || normalized.ends_with(".svg")
+        || normalized.ends_with(".xml")
+        || normalized.ends_with(".js")
+        || normalized.ends_with(".mjs")
+}
+
+async fn security_headers_middleware(request: Request, next: Next) -> Response {
+    let path = request.uri().path().to_string();
+    let mut response = next.run(request).await;
+
+    response.headers_mut().insert(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    );
+    response.headers_mut().insert(
+        HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+
+    if path.starts_with("/uploads/") && should_force_attachment_for_upload(&path) {
+        response.headers_mut().insert(
+            CONTENT_DISPOSITION,
+            HeaderValue::from_static("attachment"),
+        );
+    }
+
+    response
+}
 
 fn build_cors_layer(config: &AppConfig) -> anyhow::Result<CorsLayer> {
     let base = CorsLayer::new()
@@ -285,6 +321,7 @@ async fn main() -> anyhow::Result<()> {
         .nest_service("/uploads", ServeDir::new(config.uploads_dir.clone()))
         .fallback_service(ServeDir::new(frontend_dir).fallback(ServeFile::new(frontend_index)))
         .layer(cors)
+        .layer(middleware::from_fn(security_headers_middleware))
         .layer(TraceLayer::new_for_http());
 
     let addr = format!("{}:{}", config.host, config.port);
