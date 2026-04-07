@@ -40,6 +40,8 @@ docker compose up -d
 
 ### Docker 单容器
 
+以下镜像及其派生产物仅可按 `PolyForm-Noncommercial-1.0.0` 用于非商业用途：
+
 ```bash
 docker run -d \
   --name yt-panel \
@@ -52,7 +54,7 @@ docker run -d \
 
 ### LXC / Proxmox CT
 
-适用于 PVE 等虚拟化平台，直接复用 Alpine Docker 镜像 rootfs 创建 CT：
+适用于 PVE 等虚拟化平台，直接复用 Alpine Docker 镜像 rootfs 创建 CT。模板及镜像同样仅允许非商业用途：
 
 ```bash
 docker pull ghcr.io/ytjungle666/yt-panel-new:latest
@@ -173,6 +175,8 @@ docker build -t yt-panel:alpine .
 # 导出 PVE CT 模板
 ./scripts/export-pve-template.sh yt-panel:alpine ./artifacts/YT-Panel-NEW/release/yt-panel-alpine-ct-template.tar.zst
 ```
+
+生成的 `yt-panel-linux-amd64.tar.gz`、`yt-panel-alpine-ct-template.tar.zst` 和 Docker 镜像都会附带同一份 [LICENSE](LICENSE)。
 
 ---
 

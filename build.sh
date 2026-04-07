@@ -76,6 +76,7 @@ package_release() {
   mkdir -p "$package_root/conf" "$package_root/web"
 
   cp "$BACKEND_TARGET_DIR/${RUST_TARGET}/release/yt-panel-rust-backend" "$package_root/yt-panel"
+  cp "$REPO_ROOT/LICENSE" "$package_root/LICENSE"
   cp "$REPO_ROOT/backend/config/docker.toml" "$package_root/conf/app.toml"
   cp -R "$FRONTEND_DIST_DIR/." "$package_root/web/"
 

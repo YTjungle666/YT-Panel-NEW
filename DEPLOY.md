@@ -2,6 +2,8 @@
 
 ## Docker 部署
 
+以下 Docker 镜像和 CT 模板均适用 [PolyForm Noncommercial License 1.0.0](LICENSE)，不允许商业用途。
+
 ```bash
 # 先构建前端和 musl 后端产物
 npm ci

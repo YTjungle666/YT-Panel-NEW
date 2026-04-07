@@ -70,6 +70,7 @@ jobs:
         run: |
           mkdir -p release-out/yt-panel-linux-amd64/conf release-out/yt-panel-linux-amd64/web
           cp backend/target/${{ env.RUST_TARGET }}/release/yt-panel-rust-backend release-out/yt-panel-linux-amd64/yt-panel
+          cp LICENSE release-out/yt-panel-linux-amd64/LICENSE
           cp -r dist/. release-out/yt-panel-linux-amd64/web/
           cp backend/config/docker.toml release-out/yt-panel-linux-amd64/conf/app.toml
           tar -czf yt-panel-linux-amd64.tar.gz -C release-out yt-panel-linux-amd64
@@ -86,10 +87,14 @@ jobs:
             - Alpine Docker image
             - Linux AMD64 release package
             - PVE-ready Alpine CT template
+            - License unified to PolyForm-Noncommercial-1.0.0
 
             ## Docker
             ```bash
             docker pull ghcr.io/${{ github.repository_owner }}/yt-panel-new:latest
             ```
+
+            ## License
+            These release assets are distributed under PolyForm-Noncommercial-1.0.0 and are not licensed for commercial use.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
