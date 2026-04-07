@@ -1,6 +1,6 @@
 [package]
 name = "yt-panel-rust-backend"
-version = "1.1.4"
+version = "1.1.5"
 edition = "2021"
 description = "Rust backend for YT-Panel-NEW, a hardened self-hosted server and NAS dashboard"
 license = "PolyForm-Noncommercial-1.0.0"

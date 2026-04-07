@@ -39,7 +39,7 @@ pub async fn search_bookmarks(
     headers: HeaderMap,
     Query(req): Query<SearchRequest>,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let user_id = auth.user.id;
 
     let query = req.query.trim();
@@ -121,7 +121,7 @@ pub async fn search_suggestions(
     headers: HeaderMap,
     Query(req): Query<SearchRequest>,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let user_id = auth.user.id;
 
     let query = req.query.trim();

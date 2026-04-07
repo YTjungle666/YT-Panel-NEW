@@ -5,14 +5,11 @@ use serde_json::{json, Value};
 
 use crate::{
     auth::{
-        authenticate, build_session_cookie, cache_authenticated_user, ensure_admin,
-        invalidate_cached_token, random_token, request_is_https, validate_password_by_policy,
-        validate_register_email, validate_register_username, verify_password,
+        authenticate, build_cleared_session_cookie, ensure_admin, invalidate_cached_token,
+        random_token, request_is_https, validate_password_by_policy, validate_register_email,
+        validate_register_username, verify_password,
     },
-    db::{
-        get_setting, load_user_by_id, load_user_by_mail, load_user_by_username,
-        parse_public_user_id_setting, set_setting,
-    },
+    db::{load_user_by_id, load_user_by_mail, load_user_by_username},
     error::{list_ok, ok, ok_empty, with_set_cookie, ApiError, ApiResult},
     models::{build_user_payload, row_to_user_payload, AccessMode, AppState},
 };
@@ -59,12 +56,6 @@ pub struct AdminUsersDeleteRequest {
     user_ids: Vec<i64>,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PublicVisitUserRequest {
-    user_id: Option<i64>,
-}
-
 pub async fn user_get_info(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -86,7 +77,7 @@ pub async fn user_get_auth_info(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     Ok(ok(json!({
         "user": {
             "id": auth.user.id,
@@ -136,25 +127,18 @@ pub async fn user_update_password(
     }
     validate_password_by_policy(&state.db, &req.new_password).await?;
     let new_hash = hash(req.new_password.trim(), 12).map_err(|e| ApiError::internal(e.to_string()))?;
-    let new_token = random_token(48);
     sqlx::query(
-        "UPDATE user SET password = ?, token = ?, must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE user SET password = ?, token = '', must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
     )
     .bind(new_hash)
-    .bind(&new_token)
     .bind(auth.user.id)
     .execute(&state.db)
     .await
     .map_err(|e| ApiError::db(e.to_string()))?;
     invalidate_cached_token(&state, fresh.token.as_deref()).await;
-    let mut refreshed_user = fresh.clone();
-    refreshed_user.password = String::new();
-    refreshed_user.token = Some(new_token.clone());
-    refreshed_user.must_change_password = 0;
-    cache_authenticated_user(&state, &new_token, refreshed_user).await;
     with_set_cookie(
         ok_empty(),
-        &build_session_cookie(&new_token, request_is_https(&headers)),
+        &build_cleared_session_cookie(request_is_https(&headers)),
     )
 }
 
@@ -474,72 +458,5 @@ pub async fn panel_users_deletes(
         invalidate_cached_token(&state, Some(token.as_str())).await;
     }
 
-    if let Some(raw_value) = get_setting(&state.db, "panel_public_user_id").await? {
-        if let Some(public_user_id) = parse_public_user_id_setting(&raw_value) {
-            if req.user_ids.contains(&public_user_id) {
-                let replacement: Option<i64> = sqlx::query_scalar(
-                    "SELECT id FROM user ORDER BY CASE WHEN role = 1 THEN 0 ELSE 1 END, id ASC LIMIT 1",
-                )
-                .fetch_optional(&state.db)
-                .await
-                .map_err(|e| ApiError::db(e.to_string()))?;
-                let new_value = replacement
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "null".to_string());
-                set_setting(&state.db, "panel_public_user_id", &new_value).await?;
-            }
-        }
-    }
-
-    Ok(ok_empty())
-}
-
-pub async fn panel_users_get_public_visit_user(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
-    ensure_admin(&auth)?;
-
-    let Some(raw_value) = get_setting(&state.db, "panel_public_user_id").await? else {
-        return Ok(ok(json!({})));
-    };
-    let Some(user_id) = parse_public_user_id_setting(&raw_value) else {
-        return Ok(ok(json!({})));
-    };
-    let Some(row) = sqlx::query("SELECT id, username, name, head_image, status, role, mail, referral_code, token, created_at, updated_at, must_change_password FROM user WHERE id = ? LIMIT 1")
-        .bind(user_id)
-        .fetch_optional(&state.db)
-        .await
-        .map_err(|e| ApiError::db(e.to_string()))? else {
-        return Ok(ok(json!({})));
-    };
-
-    Ok(ok(row_to_user_payload(row)))
-}
-
-pub async fn panel_users_set_public_visit_user(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(req): Json<PublicVisitUserRequest>,
-) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
-    ensure_admin(&auth)?;
-
-    let value = if let Some(user_id) = req.user_id.filter(|value| *value > 0) {
-        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM user WHERE id = ?")
-            .bind(user_id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|e| ApiError::db(e.to_string()))?;
-        if exists.is_none() {
-            return Err(ApiError::new(-1, "No data record found"));
-        }
-        user_id.to_string()
-    } else {
-        "null".to_string()
-    };
-
-    set_setting(&state.db, "panel_public_user_id", &value).await?;
     Ok(ok_empty())
 }

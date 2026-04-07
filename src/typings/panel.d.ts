@@ -66,7 +66,6 @@ declare namespace Panel {
         footerHtml?:string
         systemMonitorShow?:boolean
         systemMonitorShowTitle?:boolean
-        systemMonitorPublicVisitModeShow?:boolean
         netModeChangeButtonShow?:boolean
         autoNetworkWallpaper?:boolean // 是否启用自动获取网络壁纸
   autoNetworkWallpaperApi?:string // 自动获取网络壁纸API地址
@@ -82,4 +81,3 @@ declare namespace Panel {
         itemIconGroupId:number
     }
 }
-

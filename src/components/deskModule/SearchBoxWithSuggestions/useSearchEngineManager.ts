@@ -1,8 +1,6 @@
 import { onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
-import { useAuthStore } from '@/store'
 import { useModuleConfig } from '@/store/modules'
-import { VisitMode } from '@/enums/auth'
 import { t } from '@/locales'
 import { add, deletes, getList, update, updateSort } from '@/api/panel/searchEngine'
 import { logError } from '@/utils/logger'
@@ -17,7 +15,6 @@ const moduleConfigName = 'deskModuleSearchBox'
 
 export function useSearchEngineManager() {
   const moduleConfig = useModuleConfig()
-  const authStore = useAuthStore()
   const ms = useMessage()
   const searchSelectListShow = ref(false)
   const searchEngineDialogVisible = ref(false)
@@ -271,9 +268,6 @@ export function useSearchEngineManager() {
   }
 
   function handleEngineClick() {
-    if (authStore.visitMode === VisitMode.VISIT_MODE_PUBLIC)
-      return
-
     searchSelectListShow.value = !searchSelectListShow.value
   }
 

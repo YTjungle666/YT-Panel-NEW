@@ -13,7 +13,6 @@ pub struct AppConfig {
     pub uploads_dir: String,
     pub frontend_dist: String,
     pub max_upload_mb: u64,
-    pub public_user_id: Option<i64>,
     pub crypto_key: Option<String>,
     #[serde(default)]
     pub cors_allowed_origins: Vec<String>,
@@ -28,7 +27,6 @@ impl Default for AppConfig {
             uploads_dir: "./uploads".into(),
             frontend_dist: "../frontend-dist".into(),
             max_upload_mb: 20,
-            public_user_id: Some(1),
             crypto_key: None,
             cors_allowed_origins: Vec::new(),
         }
@@ -59,7 +57,6 @@ pub struct AuthCacheEntry {
 #[derive(Debug, Clone, Copy)]
 pub enum AccessMode {
     LoginRequired,
-    PublicAllowed,
 }
 
 #[derive(Debug, Clone)]

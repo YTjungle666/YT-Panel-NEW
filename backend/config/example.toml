@@ -4,5 +4,4 @@ database_url = "sqlite://./database/database.db"
 uploads_dir = "./uploads"
 frontend_dist = "../frontend-dist"
 max_upload_mb = 10
-public_user_id = 1
 cors_allowed_origins = []

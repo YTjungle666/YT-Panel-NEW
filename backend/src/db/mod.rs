@@ -211,7 +211,7 @@ pub async fn init_db(db: &SqlitePool) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn seed_defaults(db: &SqlitePool, config: &AppConfig) -> anyhow::Result<()> {
+pub async fn seed_defaults(db: &SqlitePool, _config: &AppConfig) -> anyhow::Result<()> {
     sqlx::query("UPDATE user SET token = '' WHERE token != ''")
         .execute(db)
         .await
@@ -246,10 +246,6 @@ pub async fn seed_defaults(db: &SqlitePool, config: &AppConfig) -> anyhow::Resul
     )
     .await?;
     ensure_setting(db, "public_crypto_key", random_token(64)).await?;
-    if let Some(public_user_id) = config.public_user_id {
-        ensure_setting(db, "panel_public_user_id", public_user_id.to_string()).await?;
-    }
-
     Ok(())
 }
 
@@ -342,24 +338,6 @@ pub async fn get_setting(db: &SqlitePool, key: &str) -> Result<Option<String>, A
         .await
         .map_err(|e| ApiError::db(e.to_string()))?;
     Ok(row.map(|r| r.get::<String, _>("config_value")))
-}
-
-pub fn parse_public_user_id_setting(raw: &str) -> Option<i64> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
-        return None;
-    }
-
-    trimmed.parse::<i64>().ok().or_else(|| {
-        serde_json::from_str::<serde_json::Value>(trimmed)
-            .ok()
-            .and_then(|value| match value {
-                serde_json::Value::Null => None,
-                serde_json::Value::Number(number) => number.as_i64(),
-                serde_json::Value::String(value) => value.parse::<i64>().ok(),
-                _ => None,
-            })
-    })
 }
 
 async fn ensure_setting(db: &SqlitePool, key: &str, value: String) -> anyhow::Result<()> {

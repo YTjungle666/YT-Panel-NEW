@@ -13,7 +13,7 @@ use sqlx::SqlitePool;
 
 use crate::error::ApiError;
 use crate::{
-    db::{get_setting, load_user_by_id, load_user_by_persistent_token, parse_public_user_id_setting},
+    db::{get_setting, load_user_by_persistent_token},
     models::{AccessMode, AppState, AuthCacheEntry, AuthContext, CurrentUser},
 };
 
@@ -341,7 +341,7 @@ pub fn validate_register_email(email: &str) -> Result<(), ApiError> {
 pub async fn authenticate(
     headers: &HeaderMap,
     state: &AppState,
-    mode: AccessMode,
+    _mode: AccessMode,
 ) -> Result<AuthContext, ApiError> {
     if let Some(incoming_token) = request_token_value(headers) {
         if let Some(user) = resolve_user_by_token(state, &incoming_token).await? {
@@ -352,34 +352,11 @@ pub async fn authenticate(
                 });
             }
             invalidate_cached_token(state, Some(&incoming_token)).await;
-            if matches!(mode, AccessMode::LoginRequired) {
-                return Err(ApiError::new(1004, "Account disabled or not activated"));
-            }
+            return Err(ApiError::new(1004, "Account disabled or not activated"));
         }
-
-        if matches!(mode, AccessMode::LoginRequired) {
-            return Err(ApiError::new(1001, "Not logged in yet"));
-        }
-    }
-
-    if matches!(mode, AccessMode::LoginRequired) {
-        return Err(ApiError::new(1000, "Not logged in yet"));
-    }
-
-    let public_user_id = match get_setting(&state.db, "panel_public_user_id").await? {
-        Some(value) => parse_public_user_id_setting(&value),
-        None => state.config.public_user_id,
-    }
-    .ok_or_else(|| ApiError::new(1001, "Not logged in yet"))?;
-
-    let user = load_user_by_id(&state.db, public_user_id)
-        .await?
-        .ok_or_else(|| ApiError::new(1001, "Not logged in yet"))?;
-    if user.status != 1 {
         return Err(ApiError::new(1001, "Not logged in yet"));
     }
-
-    Ok(AuthContext { user, visit_mode: 1 })
+    Err(ApiError::new(1000, "Not logged in yet"))
 }
 
 pub fn ensure_admin(auth: &AuthContext) -> Result<(), ApiError> {

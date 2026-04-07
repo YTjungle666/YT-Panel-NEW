@@ -204,14 +204,6 @@ async fn main() -> anyhow::Result<()> {
             post(user_handlers::panel_users_deletes),
         )
         .route(
-            "/api/panel/users/getPublicVisitUser",
-            post(user_handlers::panel_users_get_public_visit_user),
-        )
-        .route(
-            "/api/panel/users/setPublicVisitUser",
-            post(user_handlers::panel_users_set_public_visit_user),
-        )
-        .route(
             "/api/panel/itemIconGroup/getList",
             post(panel_handlers::panel_item_icon_group_get_list),
         )

@@ -11,9 +11,7 @@
       "usernameRequired": "请输入账号且大于5个字符"
     },
     "passwordPlaceholder": "请输入密码",
-    "pblicText": "公开",
     "role": "角色",
-    "setOrUnsetPublicMode": "设置/取消公开访问",
     "userCountText": "共{count}位用户"
   },
   "api": {
@@ -113,7 +111,6 @@
       "mask": "遮罩",
       "maxWidth": "最大宽度",
       "netModeChangeButtonShow": "显示网络模式切换按钮",
-      "publicVisitModeShow": "公开模式允许显示",
       "resetWarnText": "确定要重置这些样式吗？",
       "searchBar": "搜索栏组件",
       "searchBarSearchItem": "允许搜索栏搜索项目",
@@ -146,16 +143,6 @@
       "warnConfigFileLow": "配置文件版本过低，但是兼容"
     },
     "settings": {
-      "appName": "设置",
-      "comingSoon": "敬请期待...",
-      "networkDetection": "自动判断内外网",
-      "pingUrlHint": "下方填写:当前内网打开网址，例如http://192.168.1.1:3000/ping",
-      "pingUrlPlaceholder": "http://192.168.1.1:3000/ping",
-      "testConnection": "测试连接",
-      "connectionSuccess": "连接正常",
-      "connectionFailed": "连接失败",
-      "testing": "测试中...",
-      "pleaseEnterUrl": "请输入URL地址",
       "passwordSecurity": "密码安全",
       "passwordSecurityHint": "管理首次登录改密和弱密码策略。关闭弱密码后，所有设密入口都必须满足强密码要求。",
       "allowWeakPassword": "允许弱密码",

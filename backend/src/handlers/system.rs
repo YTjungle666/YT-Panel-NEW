@@ -101,7 +101,7 @@ pub async fn module_config_get(
     headers: HeaderMap,
     Json(req): Json<NameRequest>,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let row = sqlx::query("SELECT value_json FROM module_config WHERE user_id = ? AND name = ? LIMIT 1")
         .bind(auth.user.id)
         .bind(req.name)

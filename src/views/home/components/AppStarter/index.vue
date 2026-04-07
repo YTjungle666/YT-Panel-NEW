@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NLayout, NLayoutContent, NLayoutSider, NSpace } from 'naive-ui'
 import { useAuthStore } from '@/store'
 import { AppLoader, RoundCardModal, SvgIcon } from '@/components/common'
@@ -18,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', visible: boolean): void
 }>()
+
+const authStore = useAuthStore()
 
 const componentName = ref('UserInfo')
 const collapsed = ref(false)
@@ -60,14 +62,25 @@ const apps = ref<App[]>([
   },
 ])
 
-const authStore = useAuthStore()
+function syncCurrentComponent(forceReset = false) {
+  if (authStore.userInfo?.mustChangePassword) {
+    componentName.value = 'ForceChangePassword'
+    title.value = t('settingUserInfo.updatePassword')
+    return
+  }
+
+  if (forceReset || !filteredApps.value.some(app => app.componentName === componentName.value)) {
+    componentName.value = 'UserInfo'
+    title.value = ''
+  }
+}
 
 // 过滤菜单项 - 只显示有权限的菜单
 const filteredApps = computed(() => {
   if (authStore.userInfo?.mustChangePassword) {
     return [{
       name: t('settingUserInfo.updatePassword'),
-      componentName: 'UserInfo',
+      componentName: 'ForceChangePassword',
       icon: 'mdi:password-outline',
     }]
   }
@@ -91,6 +104,7 @@ const show = computed({
 
 function handleClickApp(item: App) {
   componentName.value = item.componentName
+  title.value = item.name
   if (isSmallScreen.value)
     collapsed.value = true
 }
@@ -112,9 +126,6 @@ function handleResize() {
 }
 
 onMounted(() => {
-  if (authStore.userInfo?.mustChangePassword)
-    componentName.value = 'UserInfo'
-
   const adminApp: App = {
     name: t('adminSettingUsers.appName'),
     componentName: 'Users',
@@ -125,6 +136,7 @@ onMounted(() => {
   if (authStore.userInfo?.role === 1)
     apps.value.splice(aboutIndex === -1 ? apps.value.length : aboutIndex, 0, adminApp)
 
+  syncCurrentComponent(true)
   window.addEventListener('resize', handleResize)
   handleResize()
 })
@@ -132,6 +144,15 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
+
+watch(() => props.visible, (visible) => {
+  if (visible)
+    syncCurrentComponent(true)
+})
+
+watch(() => authStore.userInfo?.mustChangePassword, () => {
+  syncCurrentComponent(componentName.value === 'ForceChangePassword')
+}, { immediate: true })
 </script>
 
 <template>

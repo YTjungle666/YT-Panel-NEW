@@ -15,7 +15,6 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-settings'): void
   (e: 'refresh'): void
-  (e: 'login'): void
   (e: 'change-network', mode: PanelStateNetworkModeEnum): void
 }>()
 </script>
@@ -53,17 +52,6 @@ const emit = defineEmits<{
     <NButton color="#2a2a2a6b" :title="$t('panelHome.refreshData')" @click="emit('refresh')">
       <template #icon>
         <SvgIcon class="text-white font-xl" icon="shuaxin" />
-      </template>
-    </NButton>
-
-    <NButton
-      v-if="visitMode === VisitMode.VISIT_MODE_PUBLIC"
-      color="#2a2a2a6b"
-      :title="$t('panelHome.goToLogin')"
-      @click="emit('login')"
-    >
-      <template #icon>
-        <SvgIcon class="text-white font-xl" icon="material-symbols:account-circle" />
       </template>
     </NButton>
   </NButtonGroup>

@@ -27,7 +27,6 @@ export function defaultStatePanelConfig(): Panel.panelConfig {
     footerHtml: defaultFooterHtml,
     systemMonitorShow: false,
     systemMonitorShowTitle: true,
-    systemMonitorPublicVisitModeShow: false,
     netModeChangeButtonShow: true,
     autoNetworkWallpaper: false, // 默认关闭自动获取网络壁纸
     autoNetworkWallpaperApi: 'https://img.xjh.me/random_img.php?return=302&type=bg&ctype=nature', // 默认自动获取网络壁纸API地址

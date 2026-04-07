@@ -1,14 +1,16 @@
 <script lang="ts" setup>
 import { h, onMounted, reactive, ref } from 'vue'
-import { NAlert, NButton, NDataTable, NDropdown, NTag, useDialog, useMessage } from 'naive-ui'
+import { NAlert, NButton, NCard, NCheckbox, NDataTable, NDropdown, NTag, NText, useDialog, useMessage } from 'naive-ui'
 import type { DataTableColumns, PaginationProps } from 'naive-ui'
 import EditUser from './EditUser/index.vue'
-import { getPublicVisitUser, setPublicVisitUser, deletes as usersDeletes, getList as usersGetList } from '@/api/panel/users'
+import { deletes as usersDeletes, getList as usersGetList } from '@/api/panel/users'
+import { getSystemSetting, setSystemSettings } from '@/api/system/systemSetting'
 import { SvgIcon } from '@/components/common'
 import { useAuthStore } from '@/store'
 import { t } from '@/locales'
 import { AdminAuthRole } from '@/enums/admin'
 
+const SECURITY_PASSWORD_POLICY_KEY = 'security_password_policy'
 const message = useMessage()
 const authStore = useAuthStore()
 const tableIsLoading = ref<boolean>(false)
@@ -16,7 +18,8 @@ const editUserDialogShow = ref<boolean>(false)
 const keyWord = ref<string>()
 const editUserUserInfo = ref<User.Info>()
 const dialog = useDialog()
-const publicVisitUserId = ref<number | null>(null)
+const allowWeakPassword = ref(false)
+const savingPasswordPolicy = ref(false)
 
 const createColumns = ({
   update,
@@ -29,11 +32,6 @@ const createColumns = ({
       key: 'username',
       render(row: User.Info) {
         const renderTags = []
-        // 公开访问标识
-        if (publicVisitUserId.value && publicVisitUserId.value === row.id) {
-          renderTags.push(h(NTag, { type: 'warning', bordered: false, size: 'small' }, { default: () => t('adminSettingUsers.pblicText') }))
-        }
-        // 当前账号标识
         if (row.username === authStore.userInfo?.username) {
           renderTags.push(h(NTag, { type: 'success', bordered: false, size: 'small' }, { default: () => t('adminSettingUsers.currentUseUsername') }))
         }
@@ -95,22 +93,6 @@ const createColumns = ({
               case 'update':
                 update(row)
                 break
-              case 'publicMode':
-                // 取消
-                if (publicVisitUserId.value && publicVisitUserId.value === row.id) {
-                  setPublicVisitUser(null).then(({ code }) => {
-                    if (code === 0)
-                      publicVisitUserId.value = null
-                  })
-                }
-                else {
-                // 设置
-                  setPublicVisitUser(row.id as number).then(({ code }) => {
-                    if (code === 0)
-                      publicVisitUserId.value = row.id as number
-                  })
-                }
-                break
               case 'delete':
                 dialog.warning({
                   title: t('common.warning'),
@@ -131,10 +113,6 @@ const createColumns = ({
             {
               label: t('common.edit'),
               key: 'update',
-            },
-            {
-              label: t('adminSettingUsers.setOrUnsetPublicMode'),
-              key: 'publicMode',
             },
             {
               label: t('common.delete'),
@@ -215,10 +193,34 @@ async function deletes(ids: number[]) {
   }
 }
 
+async function loadPasswordPolicy() {
+  try {
+    const { data } = await getSystemSetting<{ configValue: string }>(SECURITY_PASSWORD_POLICY_KEY)
+    const parsed = data?.configValue ? JSON.parse(data.configValue) : {}
+    allowWeakPassword.value = !!parsed.allowWeakPassword
+  }
+  catch {
+    allowWeakPassword.value = false
+  }
+}
+
+async function handleSavePasswordPolicy() {
+  savingPasswordPolicy.value = true
+  try {
+    await setSystemSettings({
+      [SECURITY_PASSWORD_POLICY_KEY]: {
+        allowWeakPassword: allowWeakPassword.value,
+      },
+    })
+    message.success(t('common.saveSuccess'))
+  }
+  finally {
+    savingPasswordPolicy.value = false
+  }
+}
+
 onMounted(() => {
-  getPublicVisitUser<User.Info>().then(({ data }) => {
-    publicVisitUserId.value = data.id || null
-  })
+  loadPasswordPolicy()
   getList(null)
 })
 </script>
@@ -228,6 +230,34 @@ onMounted(() => {
     <NAlert type="info" :bordered="false">
       {{ $t('adminSettingUsers.alertText') }}
     </NAlert>
+    <NCard class="my-[10px]" :bordered="false" embedded>
+      <div class="mb-4">
+        <div class="font-medium">
+          {{ t('apps.settings.passwordSecurity') }}
+        </div>
+        <NText depth="3">
+          {{ t('apps.settings.passwordSecurityHint') }}
+        </NText>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div class="font-medium">
+            {{ t('apps.settings.allowWeakPassword') }}
+          </div>
+          <NText depth="3">
+            {{ t('apps.settings.allowWeakPasswordHint') }}
+          </NText>
+        </div>
+        <div class="flex items-center gap-3">
+          <NCheckbox v-model:checked="allowWeakPassword">
+            {{ t('apps.settings.allowWeakPassword') }}
+          </NCheckbox>
+          <NButton type="primary" size="small" :loading="savingPasswordPolicy" @click="handleSavePasswordPolicy">
+            {{ $t('common.save') }}
+          </NButton>
+        </div>
+      </div>
+    </NCard>
     <div class="my-[10px]">
       <NButton type="primary" size="small" ghost @click="handleAdd">
         {{ $t('common.add') }}

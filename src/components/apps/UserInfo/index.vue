@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import type { FormInst, FormRules } from 'naive-ui'
-import { NAlert, NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
-import { computed, ref } from 'vue'
+import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
+import { ref } from 'vue'
 import { useAppStore, useAuthStore, usePanelState, useUserStore } from '@/store'
 import { languageOptions } from '@/utils/defaultData'
 import type { Language, Theme } from '@/store/modules/app/helper'
 import { logout } from '@/api'
 import { RoundCardModal, SvgIcon } from '@/components/common/'
 import { updateInfo, updatePassword } from '@/api/system/user'
-import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
+import { router } from '@/router'
 import { clearAppScopedStorage } from '@/store/modules/auth/helper'
+import { updateLocalUserInfo } from '@/utils/cmn'
 const userStore = useUserStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -23,7 +24,6 @@ const themeValue = ref(appStore.theme)
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
 const formRef = ref<FormInst | null>(null)
-const isForcePasswordChange = computed(() => !!authStore.userInfo?.mustChangePassword)
 const themeOptions: { label: string; key: string; value: Theme }[] = [
   { label: t('apps.userInfo.themeStyle.dark'), key: 'dark', value: 'dark' },
   { label: t('apps.userInfo.themeStyle.light'), key: 'light', value: 'light' },
@@ -62,14 +62,18 @@ const updatePasswordModalFormRules: FormRules = {
 }
 
 async function logoutApi() {
-  await logout()
-  userStore.resetUserInfo()
-  authStore.removeToken()
-  panelState.removeState()
-  appStore.removeToken()
-  clearAppScopedStorage()
-  ms.success(t('settingUserInfo.logoutSuccess'))
-  location.reload()
+  try {
+    await logout()
+  }
+  finally {
+    userStore.resetUserInfo()
+    authStore.removeToken()
+    panelState.removeState()
+    appStore.removeToken()
+    clearAppScopedStorage()
+    ms.success(t('settingUserInfo.logoutSuccess'))
+    await router.replace({ path: '/login' })
+  }
 }
 
 function handleSaveInfo() {
@@ -92,11 +96,14 @@ function resetPasswordForm() {
   }
 }
 
-async function refreshUserAuthInfo() {
-  const authInfo = await updateLocalUserInfo()
-  if (authInfo?.user) {
-    authStore.setUserInfo(authInfo.user)
-  }
+async function resetClientSession(successMessage: string) {
+  userStore.resetUserInfo()
+  authStore.removeToken()
+  panelState.removeState()
+  appStore.removeToken()
+  clearAppScopedStorage()
+  ms.success(successMessage)
+  await router.replace({ path: '/login' })
 }
 
 function openPasswordModal() {
@@ -118,8 +125,7 @@ function handleUpdatePassword(e: MouseEvent) {
       if (code === 0) {
         updatePasswordModalState.value.show = false
         resetPasswordForm()
-        await refreshUserAuthInfo()
-        ms.success(t('settingUserInfo.passwordUpdateSuccess'))
+        await resetClientSession(t('settingUserInfo.passwordUpdateSuccess'))
       }
       else {
         ms.error(msg || t('common.failed'))
@@ -158,38 +164,7 @@ function handleChangeTheme(value: Theme) {
 
 <template>
   <div class="bg-slate-200 dark:bg-zinc-900 p-2 h-full">
-    <template v-if="isForcePasswordChange">
-      <NCard style="border-radius:10px" size="small">
-        <NAlert type="warning" class="mb-4">
-          {{ $t('settingUserInfo.forceChangePasswordNotice') }}
-        </NAlert>
-        <NForm ref="formRef" :model="updatePasswordModalState.form" :rules="updatePasswordModalFormRules">
-          <NFormItem path="oldPassword" :label="$t('settingUserInfo.oldPassword')">
-            <NInput v-model:value="updatePasswordModalState.form.oldPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.oldPassword')" />
-          </NFormItem>
-
-          <NFormItem path="password" :label="$t('settingUserInfo.newPassword')">
-            <NInput v-model:value="updatePasswordModalState.form.password" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
-          </NFormItem>
-
-          <NFormItem path="confirmPassword" :label="$t('settingUserInfo.confirmPassword')">
-            <NInput v-model:value="updatePasswordModalState.form.confirmPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.confirmPassword')" />
-          </NFormItem>
-        </NForm>
-        <NDivider style="margin: 10px 0;" dashed />
-        <div class="flex justify-end gap-2">
-          <NButton size="small" type="error" secondary @click="handleLogout">
-            {{ $t('settingUserInfo.logout') }}
-          </NButton>
-          <NButton type="success" size="small" :loading="updatePasswordModalState.loading" @click="handleUpdatePassword">
-            {{ $t('common.save') }}
-          </NButton>
-        </div>
-      </NCard>
-    </template>
-
-    <template v-else>
-      <NCard style="border-radius:10px" size="small">
+    <NCard style="border-radius:10px" size="small">
       <div>
         <div class="text-slate-500 font-bold">
           {{ $t('common.username') }}
@@ -247,19 +222,18 @@ function handleChangeTheme(value: Theme) {
           {{ $t('settingUserInfo.updatePassword') }}
         </NButton>
       </div>
-      </NCard>
+    </NCard>
 
-      <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-        <NButton size="small" text type="error" @click="handleLogout">
-          <template #icon>
-            <SvgIcon icon="tabler:logout" />
-          </template>
-          {{ $t('settingUserInfo.logout') }}
-        </NButton>
-      </NCard>
-    </template>
+    <NCard style="border-radius:10px" class="mt-[10px]" size="small">
+      <NButton size="small" text type="error" @click="handleLogout">
+        <template #icon>
+          <SvgIcon icon="tabler:logout" />
+        </template>
+        {{ $t('settingUserInfo.logout') }}
+      </NButton>
+    </NCard>
 
-    <RoundCardModal v-if="!isForcePasswordChange" v-model:show="updatePasswordModalState.show" size="small" preset="card" style="width: 420px" :mask-closable="true" :closable="true" :title="$t('settingUserInfo.updatePassword')">
+    <RoundCardModal v-model:show="updatePasswordModalState.show" size="small" preset="card" style="width: 420px" :mask-closable="true" :closable="true" :title="$t('settingUserInfo.updatePassword')">
       <NForm ref="formRef" :model="updatePasswordModalState.form" :rules="updatePasswordModalFormRules">
         <NFormItem path="oldPassword" :label="$t('settingUserInfo.oldPassword')">
           <NInput v-model:value="updatePasswordModalState.form.oldPassword" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.oldPassword')" />

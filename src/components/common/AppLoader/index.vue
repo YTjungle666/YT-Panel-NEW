@@ -11,9 +11,9 @@ const dynamicComponent = shallowRef<Component | null>(null)
 
 const componentLoaders: Record<string, () => Promise<any>> = {
   About: () => import('../../apps/About/index.vue'),
+  ForceChangePassword: () => import('../../apps/ForceChangePassword/index.vue'),
   ImportExport: () => import('../../apps/ImportExport/index.vue'),
   ItemGroupManage: () => import('../../apps/ItemGroupManage/index.vue'),
-  Settings: () => import('../../apps/Settings/index.vue'),
   Style: () => import('../../apps/Style/index.vue'),
   UploadFileManager: () => import('../../apps/UploadFileManager/index.vue'),
   UserInfo: () => import('../../apps/UserInfo/index.vue'),

@@ -52,7 +52,7 @@ pub async fn panel_user_config_get(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let row = sqlx::query("SELECT panel_json, search_engine_json FROM user_config WHERE user_id = ?")
         .bind(auth.user.id)
         .fetch_optional(&state.db)
@@ -120,7 +120,7 @@ pub async fn panel_item_icon_group_get_list(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let mut rows = sqlx::query(
         "SELECT id, icon, title, description, sort, created_at, updated_at \
          FROM item_icon_group WHERE user_id = ? ORDER BY sort ASC, created_at ASC",
@@ -300,7 +300,7 @@ pub async fn panel_item_icon_get_list_by_group_id(
     headers: HeaderMap,
     Json(req): Json<Value>,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let group_id = parse_i64(req.get("itemIconGroupId"));
     let rows = sqlx::query(
         "SELECT id, created_at, updated_at, icon_json, title, url, lan_url, description, \
@@ -1065,7 +1065,7 @@ pub async fn panel_bookmark_get_list(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let rows = sqlx::query(
         "SELECT id, created_at, icon_json, title, url, lan_url, sort, is_folder, parent_url, parent_id \
          FROM bookmark WHERE user_id = ? ORDER BY sort ASC, created_at ASC",
@@ -1541,7 +1541,7 @@ pub async fn panel_search_engine_get_list(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> ApiResult {
-    let auth = authenticate(&headers, &state, AccessMode::PublicAllowed).await?;
+    let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let rows = sqlx::query(
         "SELECT id, icon_src, title, url, sort, user_id, created_at, updated_at \
          FROM search_engine WHERE user_id = ? AND deleted_at IS NULL ORDER BY sort ASC",

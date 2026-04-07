@@ -125,12 +125,8 @@ export function useHomePageLifecycle(options: UseHomePageLifecycleOptions) {
     if (panelState.panelConfig.logoText)
       setTitle(panelState.panelConfig.logoText)
 
-    if (authStore.visitMode === VisitMode.VISIT_MODE_PUBLIC) {
-      panelState.setNetworkMode(PanelStateNetworkModeEnum.wan)
-    } else {
-      const isLan = await checkIsLanFromServer()
-      panelState.setNetworkMode(isLan ? PanelStateNetworkModeEnum.lan : PanelStateNetworkModeEnum.wan)
-    }
+    const isLan = await checkIsLanFromServer()
+    panelState.setNetworkMode(isLan ? PanelStateNetworkModeEnum.lan : PanelStateNetworkModeEnum.wan)
 
     await loadBookmarkTree(false)
   })

@@ -13,7 +13,6 @@ import { SvgIcon } from '@/components/common'
 import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { VisitMode } from '@/enums/auth'
 import { t } from '@/locales'
-import { router } from '@/router'
 
 const SearchBoxWithSuggestions = defineAsyncComponent(() => import('@/components/deskModule/SearchBoxWithSuggestions/index.vue'))
 const SystemMonitor = defineAsyncComponent(() => import('@/components/deskModule/SystemMonitor/index.vue'))
@@ -154,9 +153,7 @@ const {
         <div :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }">
           <!-- 系统监控状态 -->
           <div
-            v-if="panelState.panelConfig.systemMonitorShow
-              && ((panelState.panelConfig.systemMonitorPublicVisitModeShow && authStore.visitMode === VisitMode.VISIT_MODE_PUBLIC)
-                || authStore.visitMode === VisitMode.VISIT_MODE_LOGIN)"
+            v-if="panelState.panelConfig.systemMonitorShow && authStore.visitMode === VisitMode.VISIT_MODE_LOGIN"
             class="flex mx-auto"
           >
             <SystemMonitor
@@ -288,13 +285,11 @@ const {
         :panel-config="panelState.panelConfig"
         @toggle-settings="settingModalShow = !settingModalShow"
         @refresh="handleRefreshData"
-        @login="router.push('/login')"
         @change-network="handleChangeNetwork"
       />
 
       <AppStarter v-model:visible="settingModalShow" />
       <NotePad ref="notepadInstance" v-model:visible="notepadVisible" />
-      <!-- <Setting v-model:visible="settingModalShow" /> -->
     </div>
 
     <NBackTop
