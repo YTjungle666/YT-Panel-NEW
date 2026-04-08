@@ -9,6 +9,7 @@ import { clearAppScopedStorage } from '@/store/modules/auth/helper'
 import { t } from '@/locales'
 import { router } from '@/router'
 import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
+import { suppressLoginExpiredNotice } from '@/utils/request'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -56,6 +57,7 @@ function resetPasswordForm() {
 }
 
 async function resetClientSession(successMessage: string) {
+  suppressLoginExpiredNotice()
   userStore.resetUserInfo()
   authStore.removeToken()
   panelState.removeState()
@@ -94,7 +96,7 @@ function handleUpdatePassword(e: MouseEvent) {
         }
 
         resetPasswordForm()
-        await resetClientSession(t('settingUserInfo.passwordUpdateSuccess'))
+        await resetClientSession(t('settingUserInfo.passwordUpdatedRelogin'))
       })
       .catch(() => {
         ms.error(t('common.serverError'))
@@ -131,6 +133,9 @@ function handleLogout() {
 
         <NFormItem path="password" :label="$t('settingUserInfo.newPassword')">
           <NInput v-model:value="formState.form.password" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
+          <div class="mt-1 text-xs text-slate-500">
+            {{ $t('settingUserInfo.passwordRuleHint') }}
+          </div>
         </NFormItem>
 
         <NFormItem path="confirmPassword" :label="$t('settingUserInfo.confirmPassword')">

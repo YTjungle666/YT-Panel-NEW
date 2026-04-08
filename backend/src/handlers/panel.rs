@@ -59,7 +59,7 @@ pub async fn panel_user_config_get(
         .await
         .map_err(|e| ApiError::db(e.to_string()))?;
     let Some(row) = row else {
-        return Err(ApiError::new(-1, "No data record found"));
+        return Err(ApiError::new(-1, "未找到数据记录"));
     };
 
     let panel = row
@@ -242,7 +242,7 @@ pub async fn panel_item_icon_group_deletes(
         .await
         .unwrap_or(0);
     if req.ids.len() as i64 >= count {
-        return Err(ApiError::new(1201, "Please keep at least one"));
+        return Err(ApiError::new(1201, "请至少保留一个"));
     }
 
     let mut tx = state.db.begin().await.map_err(|e| ApiError::db(e.to_string()))?;
@@ -576,23 +576,23 @@ fn is_unsafe_outbound_ip(ip: IpAddr) -> bool {
 
 async fn ensure_safe_outbound_url(url: &Url) -> Result<(), ApiError> {
     if !matches!(url.scheme(), "http" | "https") {
-        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+        return Err(ApiError::new(-1, "无效或不安全的 URL"));
     }
     if !url.username().is_empty() || url.password().is_some() {
-        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+        return Err(ApiError::new(-1, "无效或不安全的 URL"));
     }
 
     let host = url
         .host_str()
-        .ok_or_else(|| ApiError::new(-1, "invalid or unsafe URL"))?;
+        .ok_or_else(|| ApiError::new(-1, "无效或不安全的 URL"))?;
 
     if is_blocked_outbound_hostname(host) {
-        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+        return Err(ApiError::new(-1, "无效或不安全的 URL"));
     }
 
     if let Ok(ip) = host.parse::<IpAddr>() {
         if is_unsafe_outbound_ip(ip) {
-            return Err(ApiError::new(-1, "invalid or unsafe URL"));
+            return Err(ApiError::new(-1, "无效或不安全的 URL"));
         }
         return Ok(());
     }
@@ -601,16 +601,16 @@ async fn ensure_safe_outbound_url(url: &Url) -> Result<(), ApiError> {
     let mut resolved_any = false;
     let addrs = lookup_host((host, port))
         .await
-        .map_err(|_| ApiError::new(-1, "invalid or unsafe URL"))?;
+        .map_err(|_| ApiError::new(-1, "无效或不安全的 URL"))?;
     for addr in addrs {
         resolved_any = true;
         if is_unsafe_outbound_ip(addr.ip()) {
-            return Err(ApiError::new(-1, "invalid or unsafe URL"));
+            return Err(ApiError::new(-1, "无效或不安全的 URL"));
         }
     }
 
     if !resolved_any {
-        return Err(ApiError::new(-1, "invalid or unsafe URL"));
+        return Err(ApiError::new(-1, "无效或不安全的 URL"));
     }
 
     Ok(())
@@ -973,12 +973,12 @@ async fn read_response_text_limited(
 }
 
 async fn resolve_site_favicon_data_url(url: &str) -> Result<String, ApiError> {
-    let parsed = Url::parse(url).map_err(|_| ApiError::new(-1, "invalid or unsafe URL"))?;
+    let parsed = Url::parse(url).map_err(|_| ApiError::new(-1, "无效或不安全的 URL"))?;
     ensure_safe_outbound_url(&parsed).await?;
 
     let host = parsed
         .host_str()
-        .ok_or_else(|| ApiError::new(-1, "invalid or unsafe URL"))?;
+        .ok_or_else(|| ApiError::new(-1, "无效或不安全的 URL"))?;
     let origin = parsed.origin().ascii_serialization();
     let is_proxmox = host.to_ascii_lowercase().contains("pve")
         || parsed.port_or_known_default() == Some(8006)
@@ -1510,7 +1510,7 @@ pub async fn panel_notepad_upload(
             "docx", "xls", "xlsx",
         ];
         if !allow.contains(&ext.as_str()) {
-            return Err(ApiError::new(-1, "file type not allowed"));
+            return Err(ApiError::new(-1, "当前文件类型不允许上传"));
         }
 
         let (relative_db_path, public_url, ext) =
@@ -1534,7 +1534,7 @@ pub async fn panel_notepad_upload(
         })));
     }
 
-    Err(ApiError::new(1300, "Upload failed"))
+    Err(ApiError::new(1300, "上传失败"))
 }
 
 pub async fn panel_search_engine_get_list(

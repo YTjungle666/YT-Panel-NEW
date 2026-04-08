@@ -75,7 +75,7 @@ pub async fn register_commit(
         .unwrap_or_else(|_| default_system_application_value());
     let register_config = parse_register_config(value.get("register"));
     if !register_config.open_register {
-        return Err(ApiError::new(1403, "Registration is disabled"));
+        return Err(ApiError::new(1403, "注册已关闭"));
     }
 
     let username = req.username.trim();
@@ -89,15 +89,15 @@ pub async fn register_commit(
     if !register_config.email_suffix.trim().is_empty() {
         let suffix = register_config.email_suffix.trim().to_lowercase();
         if !email.ends_with(&suffix) {
-            return Err(ApiError::bad_param(format!("Email must end with {}", suffix)));
+            return Err(ApiError::bad_param(format!("邮箱必须以 {} 结尾", suffix)));
         }
     }
 
     if load_user_by_username(&state.db, username).await?.is_some() {
-        return Err(ApiError::new(1401, "The username already exists"));
+        return Err(ApiError::new(1401, "账号已存在"));
     }
     if load_user_by_mail(&state.db, &email).await?.is_some() {
-        return Err(ApiError::new(1401, "The email already exists"));
+        return Err(ApiError::new(1401, "邮箱已存在"));
     }
 
     let password_hash = hash(password, 12).map_err(|e| ApiError::internal(e.to_string()))?;
@@ -128,14 +128,14 @@ pub async fn login(
 ) -> ApiResult {
     let username = req.username.trim();
     let Some(user) = load_user_by_username(&state.db, username).await? else {
-        return Err(ApiError::new(1003, "Incorrect username or password"));
+        return Err(ApiError::new(1003, "用户名或密码错误"));
     };
 
     if !verify_password(&req.password, &user.password).await {
-        return Err(ApiError::new(1003, "Incorrect username or password"));
+        return Err(ApiError::new(1003, "用户名或密码错误"));
     }
     if user.status != 1 {
-        return Err(ApiError::new(1004, "Account disabled or not activated"));
+        return Err(ApiError::new(1004, "账号已停用或未激活"));
     }
 
     let previous_token = user.token.clone().filter(|value| !value.is_empty());

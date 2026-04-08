@@ -260,7 +260,7 @@ pub async fn load_user_by(
         "username" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE username = ? LIMIT 1",
         "mail" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE mail = ? LIMIT 1",
         "token" => "SELECT id, username, password, name, head_image, status, role, mail, referral_code, token, must_change_password FROM user WHERE token = ? LIMIT 1",
-        _ => return Err(ApiError::bad_param("invalid field")),
+        _ => return Err(ApiError::bad_param("无效字段")),
     };
 
     let row = sqlx::query(sql)

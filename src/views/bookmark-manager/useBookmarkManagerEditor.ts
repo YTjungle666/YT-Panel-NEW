@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import { add as addBookmark, deletes, update } from '@/api/panel/bookmark'
 import { t } from '@/locales'
 import { logError } from '@/utils/logger'
-import { dialog } from '@/utils/request/apiMessage'
+import { dialog, resolveApiErrorMessage } from '@/utils/request/apiMessage'
 import type { Bookmark } from './types'
 
 interface BookmarkManagerMessageApi {
@@ -137,7 +137,7 @@ export function useBookmarkManagerEditor(options: UseBookmarkManagerEditorOption
           isEditDialogOpen.value = false
           isCreateMode.value = false
         } else {
-          message.error(`${t('bookmarkManager.createFailed')} ${createResponse?.msg || t('bookmarkManager.unknownError')}`)
+          message.error(`${t('bookmarkManager.createFailed')} ${resolveApiErrorMessage(createResponse)}`)
         }
       } else {
         const isFolderItem = currentBookmark.value?.isFolder
@@ -159,7 +159,7 @@ export function useBookmarkManagerEditor(options: UseBookmarkManagerEditorOption
           updateCacheAfterUpdate(updateResponse.data)
           isEditDialogOpen.value = false
         } else {
-          message.error(`${t('bookmarkManager.updateFailed')} ${updateResponse?.msg || t('bookmarkManager.unknownError')}`)
+          message.error(`${t('bookmarkManager.updateFailed')} ${resolveApiErrorMessage(updateResponse)}`)
         }
       }
     } catch (error) {
@@ -190,7 +190,7 @@ export function useBookmarkManagerEditor(options: UseBookmarkManagerEditorOption
 
             updateCacheAfterDelete(Number(bookmark.id))
           } else {
-            message.error(`${t('common.failed')}: ${response.msg}`)
+            message.error(resolveApiErrorMessage(response))
           }
         } catch (error) {
           message.error(`${t('common.failed')} ${(error as Error).message || t('bookmarkManager.unknownError')}`)

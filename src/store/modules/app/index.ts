@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { AppState, Language, Theme } from './helper'
+import type { AppState, Theme } from './helper'
 import { defaultSetting, getLocalSetting, removeLocalState, setLocalSetting } from './helper'
 import { store } from '@/store'
 import { useTheme } from '@/hooks/useTheme'
@@ -15,13 +15,6 @@ export const useAppStore = defineStore('app-store', {
     setTheme(theme: Theme) {
       this.theme = theme
       this.recordState()
-    },
-
-    setLanguage(language: Language) {
-      if (this.language !== language) {
-        this.language = language
-        this.recordState()
-      }
     },
 
     getTheme() {

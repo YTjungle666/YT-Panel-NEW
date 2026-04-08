@@ -228,16 +228,14 @@ pub async fn verify_password(plain: &str, stored: &str) -> bool {
 
 pub fn validate_register_username(username: &str) -> Result<(), ApiError> {
     if !(3..=80).contains(&username.len()) {
-        return Err(ApiError::bad_param(
-            "Username length must be between 3 and 80 characters",
-        ));
+        return Err(ApiError::bad_param("账号长度必须为 3 到 80 个字符"));
     }
     if !username
         .chars()
         .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '@'))
     {
         return Err(ApiError::bad_param(
-            "Username can only contain letters, numbers, _, . and @",
+            "账号只能包含字母、数字、下划线、点和 @",
         ));
     }
     Ok(())
@@ -245,20 +243,16 @@ pub fn validate_register_username(username: &str) -> Result<(), ApiError> {
 
 fn validate_register_password(password: &str, allow_weak_password: bool) -> Result<(), ApiError> {
     if password.is_empty() {
-        return Err(ApiError::bad_param("Password is required"));
+        return Err(ApiError::bad_param("请输入密码"));
     }
     if password.len() > 64 {
-        return Err(ApiError::bad_param(
-            "Password length must not exceed 64 characters",
-        ));
+        return Err(ApiError::bad_param("密码长度不能超过 64 个字符"));
     }
     if !allow_weak_password && password.len() < 8 {
-        return Err(ApiError::bad_param(
-            "Password length must be between 8 and 64 characters",
-        ));
+        return Err(ApiError::bad_param("关闭弱密码后，密码必须为 8 到 64 位"));
     }
     if password.chars().any(char::is_whitespace) {
-        return Err(ApiError::bad_param("Password cannot contain whitespace"));
+        return Err(ApiError::bad_param("密码不能包含空白字符"));
     }
     Ok(())
 }
@@ -331,7 +325,7 @@ pub async fn validate_password_by_policy(
     validate_register_password(password, policy.allow_weak_password)?;
     if !policy.allow_weak_password && is_weak_password(password) {
         return Err(ApiError::bad_param(
-            "Password is too weak. Use at least three character types: uppercase, lowercase, numbers, and symbols",
+            "关闭弱密码后，密码至少需要包含大写字母、小写字母、数字、符号中的 3 类",
         ));
     }
     Ok(())
@@ -341,7 +335,7 @@ pub fn validate_register_email(email: &str) -> Result<(), ApiError> {
     let email_regex = Regex::new(r"^\w+([-.+]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$")
         .expect("email regex must compile");
     if !email_regex.is_match(email) {
-        return Err(ApiError::bad_param("Invalid email address"));
+        return Err(ApiError::bad_param("邮箱格式不正确"));
     }
     Ok(())
 }
@@ -360,16 +354,16 @@ pub async fn authenticate(
                 });
             }
             invalidate_cached_token(state, Some(&incoming_token)).await;
-            return Err(ApiError::new(1004, "Account disabled or not activated"));
+            return Err(ApiError::new(1004, "账号已停用或未激活"));
         }
-        return Err(ApiError::new(1001, "Not logged in yet"));
+        return Err(ApiError::new(1001, "登录状态已失效，请重新登录"));
     }
-    Err(ApiError::new(1000, "Not logged in yet"))
+    Err(ApiError::new(1000, "未登录"))
 }
 
 pub fn ensure_admin(auth: &AuthContext) -> Result<(), ApiError> {
     if auth.user.role != 1 {
-        Err(ApiError::new(1005, "No current permission for operation"))
+        Err(ApiError::new(1005, "当前无权限操作"))
     } else {
         Ok(())
     }

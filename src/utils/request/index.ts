@@ -2,10 +2,12 @@ import type { AxiosProgressEvent, AxiosResponse, GenericAbortSignal } from 'axio
 import request from './axios'
 import { apiRespErrMsg, message, resolveApiErrorMessage } from './apiMessage'
 import { t } from '@/locales'
-import { useAppStore, useAuthStore } from '@/store'
+import { useAuthStore } from '@/store'
 import { router } from '@/router'
 
 let loginMessageShow = false
+let passwordChangeRequiredNoticeUntil = 0
+let suppressLoginExpiredNoticeUntil = 0
 export interface HttpOption {
   url: string
   data?: any
@@ -23,19 +25,28 @@ export interface Response<T = any> {
   code: number
 }
 
+export function suppressLoginExpiredNotice(durationMs = 3000) {
+  suppressLoginExpiredNoticeUntil = Date.now() + durationMs
+}
+
 function http<T = any>(
   { url, data, method, headers, onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
 ) {
   const authStore = useAuthStore()
-  const appStore = useAppStore()
   const successHandler = (res: AxiosResponse<Response<T>>) => {
     if (res.data.code === 0)
       return res.data
 
     if (res.data.code === 1001) {
+      if (Date.now() < suppressLoginExpiredNoticeUntil) {
+        router.push({ path: '/login' })
+        authStore.removeToken()
+        return res.data
+      }
+
       if (loginMessageShow === false) {
         loginMessageShow = true
-        message.warning(t('api.loginExpires'), {
+        message.warning(resolveApiErrorMessage(res.data) || t('api.loginExpires'), {
           onLeave() {
             loginMessageShow = false
           },
@@ -59,7 +70,10 @@ function http<T = any>(
     }
 
     if (res.data.code === 1108) {
-      message.warning(resolveApiErrorMessage(res.data))
+      if (Date.now() >= passwordChangeRequiredNoticeUntil) {
+        passwordChangeRequiredNoticeUntil = Date.now() + 1500
+        message.warning(resolveApiErrorMessage(res.data))
+      }
       return res.data
     }
 
@@ -94,7 +108,6 @@ function http<T = any>(
   if (!headers)
     headers = {}
 
-  headers.lang = appStore.language
   return method === 'GET'
     ? request.get(url, { params, headers, signal, onDownloadProgress }).then(successHandler, failHandler)
     : request.post(url, params, { headers, signal, onDownloadProgress }).then(successHandler, failHandler)

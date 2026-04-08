@@ -39,7 +39,7 @@ pub async fn file_upload_img(
             .to_lowercase();
         let allowed = ["png", "jpg", "jpeg", "gif", "webp", "ico"];
         if !allowed.contains(&ext.as_str()) {
-            return Err(ApiError::new(1301, "Unsupported file format"));
+            return Err(ApiError::new(1301, "不支持的文件格式"));
         }
         let bytes = field
             .bytes()
@@ -49,14 +49,14 @@ pub async fn file_upload_img(
         if bytes.len() > max_bytes {
             return Err(ApiError::new(
                 1300,
-                format!("file too large (max {}MB)", state.config.max_upload_mb),
+                format!("文件过大，最大支持 {}MB", state.config.max_upload_mb),
             ));
         }
         let mime = MimeGuess::from_ext(&ext).first_or_octet_stream();
         let data_url = format!("data:{};base64,{}", mime, B64.encode(bytes));
         return Ok(ok(json!({ "imageUrl": data_url })));
     }
-    Err(ApiError::new(1300, "Upload failed"))
+    Err(ApiError::new(1300, "上传失败"))
 }
 
 pub async fn file_upload_files(

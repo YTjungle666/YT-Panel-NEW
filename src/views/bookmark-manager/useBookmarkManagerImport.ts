@@ -5,6 +5,7 @@ import {
   flattenBookmarkTree,
   parseBrowserBookmarkHTML,
 } from '@/utils/bookmarkImportExport'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 import { ss } from '@/utils/storage/local'
 import { BOOKMARKS_CACHE_KEY } from './bookmarkTreeState'
 
@@ -106,7 +107,7 @@ export function useBookmarkManagerImport(options: UseBookmarkManagerImportOption
         await refreshBookmarks(true)
         message.success(t('bookmarkManager.importSuccess', { count: bookmarkList.length }))
       } else {
-        message.error(response.msg || t('bookmarkManager.unknownError'))
+        message.error(resolveApiErrorMessage(response))
       }
     } catch (error) {
       message.error((error as Error).message || t('bookmarkManager.unknownError'))

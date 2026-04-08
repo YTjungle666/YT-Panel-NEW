@@ -98,7 +98,7 @@ pub async fn user_update_info(
 ) -> ApiResult {
     let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     if req.name.trim().len() < 2 || req.name.trim().len() > 15 {
-        return Err(ApiError::bad_param("name length invalid"));
+        return Err(ApiError::bad_param("名称长度必须为 2 到 15 个字符"));
     }
     sqlx::query(
         "UPDATE user SET head_image = ?, name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -120,10 +120,10 @@ pub async fn user_update_password(
 ) -> ApiResult {
     let auth = authenticate(&headers, &state, AccessMode::LoginRequired).await?;
     let Some(fresh) = load_user_by_id(&state.db, auth.user.id).await? else {
-        return Err(ApiError::new(1006, "Account does not exist"));
+        return Err(ApiError::new(1006, "账号不存在"));
     };
     if !verify_password(&req.old_password, &fresh.password).await {
-        return Err(ApiError::new(1007, "Old password error"));
+        return Err(ApiError::new(1007, "旧密码错误"));
     }
     validate_password_by_policy(&state.db, &req.new_password).await?;
     let new_hash = hash(req.new_password.trim(), 12).map_err(|e| ApiError::internal(e.to_string()))?;
@@ -170,18 +170,18 @@ pub async fn panel_users_create(
 
     let username = req.username.trim();
     if username.len() < 5 {
-        return Err(ApiError::bad_param("The account must be no less than 5 characters long"));
+        return Err(ApiError::bad_param("账号长度不能少于 5 个字符"));
     }
     validate_register_username(username)?;
 
     let password = req.password.as_deref().unwrap_or("").trim();
     if password.is_empty() {
-        return Err(ApiError::bad_param("Password is required"));
+        return Err(ApiError::bad_param("请输入密码"));
     }
     validate_password_by_policy(&state.db, password).await?;
 
     if load_user_by_username(&state.db, username).await?.is_some() {
-        return Err(ApiError::new(1401, "The username already exists"));
+        return Err(ApiError::new(1401, "账号已存在"));
     }
 
     let mail = req
@@ -193,7 +193,7 @@ pub async fn panel_users_create(
     if let Some(mail_value) = mail.as_deref() {
         validate_register_email(mail_value)?;
         if load_user_by_mail(&state.db, mail_value).await?.is_some() {
-            return Err(ApiError::new(1401, "The email already exists"));
+            return Err(ApiError::new(1401, "邮箱已存在"));
         }
     }
 
@@ -248,22 +248,22 @@ pub async fn panel_users_update(
 
     let id = req.id.unwrap_or_default();
     if id <= 0 {
-        return Err(ApiError::bad_param("User id is required"));
+        return Err(ApiError::bad_param("用户 ID 不能为空"));
     }
 
     let Some(existing) = load_user_by_id(&state.db, id).await? else {
-        return Err(ApiError::new(1006, "Account does not exist"));
+        return Err(ApiError::new(1006, "账号不存在"));
     };
 
     let username = req.username.trim();
     if username.len() < 3 {
-        return Err(ApiError::bad_param("The account must be no less than 3 characters long"));
+        return Err(ApiError::bad_param("账号长度不能少于 3 个字符"));
     }
     validate_register_username(username)?;
 
     if let Some(found) = load_user_by_username(&state.db, username).await? {
         if found.id != id {
-            return Err(ApiError::new(1401, "The username already exists"));
+            return Err(ApiError::new(1401, "账号已存在"));
         }
     }
 
@@ -277,7 +277,7 @@ pub async fn panel_users_update(
         validate_register_email(mail_value)?;
         if let Some(found) = load_user_by_mail(&state.db, mail_value).await? {
             if found.id != id {
-                return Err(ApiError::new(1401, "The email already exists"));
+                return Err(ApiError::new(1401, "邮箱已存在"));
             }
         }
     }
@@ -301,7 +301,7 @@ pub async fn panel_users_update(
                 .await
                 .map_err(|e| ApiError::db(e.to_string()))?;
         if admin_count == 0 {
-            return Err(ApiError::new(1201, "Please keep at least one"));
+            return Err(ApiError::new(1201, "请至少保留一个"));
         }
     }
 
@@ -449,7 +449,7 @@ pub async fn panel_users_deletes(
         .map_err(|e| ApiError::db(e.to_string()))?;
     if admin_count == 0 {
         tx.rollback().await.map_err(|e| ApiError::db(e.to_string()))?;
-        return Err(ApiError::new(1201, "Please keep at least one"));
+        return Err(ApiError::new(1201, "请至少保留一个"));
     }
 
     tx.commit().await.map_err(|e| ApiError::db(e.to_string()))?;

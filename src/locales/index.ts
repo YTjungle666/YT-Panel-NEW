@@ -1,6 +1,5 @@
 import type { App } from 'vue'
 import { createI18n } from 'vue-i18n'
-import enUS from './en-US.json'
 import zhCN from './zh-CN.json'
 
 const defaultLocale = 'zh-CN'
@@ -10,7 +9,6 @@ const i18n = createI18n({
   fallbackLocale: defaultLocale,
   allowComposition: true,
   messages: {
-    'en-US': enUS,
     'zh-CN': zhCN,
   },
 })

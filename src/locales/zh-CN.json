@@ -7,6 +7,7 @@
     "deletePromptContent": "你确定删除{name}({username})？",
     "formRules": {
       "passwordLimit": "密码长度不能超过 20 个字符",
+      "passwordRuleHint": "关闭弱密码后，新密码至少 8 位，且至少包含大写字母、小写字母、数字、符号中的 3 类",
       "roleRequired": "请选择角色",
       "usernameRequired": "请输入账号且大于5个字符"
     },
@@ -38,6 +39,19 @@
     "1401": "账号或邮箱已存在",
     "1500": "服务器内部错误",
     "1503": "当前实例暂未配置邮件重置能力，请联系管理员手动重置密码"
+  },
+  "apiErrorMessage": {
+    "emailInvalid": "邮箱格式不正确",
+    "emailSuffixRequired": "邮箱必须以 {suffix} 结尾",
+    "nameLength": "名称长度必须为 2 到 15 个字符",
+    "passwordLengthStrong": "关闭弱密码后，密码必须为 8 到 64 位",
+    "passwordRequired": "请输入密码",
+    "passwordTooWeak": "关闭弱密码后，密码至少需要包含大写字母、小写字母、数字、符号中的 3 类",
+    "passwordWhitespace": "密码不能包含空白字符",
+    "usernameCharset": "账号只能包含字母、数字、下划线、点和 @",
+    "usernameLength": "账号长度必须为 3 到 80 个字符",
+    "usernameMin3": "账号长度不能少于 3 个字符",
+    "usernameMin5": "账号长度不能少于 5 个字符"
   },
   "appLauncher": {
     "title": "系统应用"
@@ -357,6 +371,7 @@
     "oldPassword": "旧密码",
     "updatePassword": "修改密码",
     "passwordLimit": "密码长度不能超过 64 个字符",
+    "passwordRuleHint": "关闭弱密码后，新密码必须为 8 到 64 位，且至少包含大写字母、小写字母、数字、符号中的 3 类",
     "forceChangePasswordNotice": "当前账号仍在使用初始密码，请先修改为强密码后再继续使用。",
     "passwordUpdatedRelogin": "密码修改成功，请重新登录"
   }

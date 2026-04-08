@@ -3,8 +3,7 @@ import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
 import { ref } from 'vue'
 import { useAppStore, useAuthStore, usePanelState, useUserStore } from '@/store'
-import { languageOptions } from '@/utils/defaultData'
-import type { Language, Theme } from '@/store/modules/app/helper'
+import type { Theme } from '@/store/modules/app/helper'
 import { logout } from '@/api'
 import { RoundCardModal, SvgIcon } from '@/components/common/'
 import { updateInfo, updatePassword } from '@/api/system/user'
@@ -13,6 +12,7 @@ import { router } from '@/router'
 import { clearAppScopedStorage } from '@/store/modules/auth/helper'
 import { updateLocalUserInfo } from '@/utils/cmn'
 import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
+import { suppressLoginExpiredNotice } from '@/utils/request'
 const userStore = useUserStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -20,7 +20,6 @@ const panelState = usePanelState()
 const ms = useMessage()
 const dialog = useDialog()
 
-const languageValue = ref(appStore.language)
 const themeValue = ref(appStore.theme)
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
@@ -82,7 +81,7 @@ function handleSaveInfo() {
       isEditNickNameStatus.value = false
     }
     else {
-      ms.error(`${t('common.editFail')}:${msg}`)
+      ms.error(resolveApiErrorMessage({ code, msg }))
     }
   })
 }
@@ -96,6 +95,7 @@ function resetPasswordForm() {
 }
 
 async function resetClientSession(successMessage: string) {
+  suppressLoginExpiredNotice()
   userStore.resetUserInfo()
   authStore.removeToken()
   panelState.removeState()
@@ -124,7 +124,7 @@ function handleUpdatePassword(e: MouseEvent) {
       if (code === 0) {
         updatePasswordModalState.value.show = false
         resetPasswordForm()
-        await resetClientSession(t('settingUserInfo.passwordUpdateSuccess'))
+        await resetClientSession(t('settingUserInfo.passwordUpdatedRelogin'))
       }
       else {
         ms.error(resolveApiErrorMessage({ code, msg }))
@@ -147,12 +147,6 @@ function handleLogout() {
       logoutApi()
     },
   })
-}
-
-function handleChangeLanuage(value: Language) {
-  languageValue.value = value
-  appStore.setLanguage(value)
-  location.reload()
 }
 
 function handleChangeTheme(value: Theme) {
@@ -199,15 +193,6 @@ function handleChangeTheme(value: Theme) {
 
       <div class="mt-[10px]">
         <div class="text-slate-500 font-bold">
-          {{ $t('common.language') }}
-        </div>
-        <div class="max-w-[200px]">
-          <NSelect v-model:value="languageValue" :options="languageOptions" @update-value="handleChangeLanuage" />
-        </div>
-      </div>
-
-      <div class="mt-[10px]">
-        <div class="text-slate-500 font-bold">
           {{ $t('apps.userInfo.theme') }}
         </div>
         <div class="max-w-[200px]">
@@ -240,6 +225,9 @@ function handleChangeTheme(value: Theme) {
 
         <NFormItem path="password" :label="$t('settingUserInfo.newPassword')">
           <NInput v-model:value="updatePasswordModalState.form.password" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
+          <div class="mt-1 text-xs text-slate-500">
+            {{ $t('settingUserInfo.passwordRuleHint') }}
+          </div>
         </NFormItem>
 
         <NFormItem path="confirmPassword" :label="$t('settingUserInfo.confirmPassword')">

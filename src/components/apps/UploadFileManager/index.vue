@@ -8,6 +8,7 @@ import { copyToClipboard, timeFormat } from '@/utils/cmn'
 import { t } from '@/locales'
 import { usePanelState } from '@/store'
 import { ss } from '@/utils/storage'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 // 用户配置缓存键
 const USER_CONFIG_CACHE_KEY = 'USER_CONFIG_CACHE'
@@ -64,7 +65,7 @@ async function deletesImges(id: number) {
       ms.success(t('common.success'))
     }
     else {
-      ms.error(`${t('common.failed')}:${msg}`)
+      ms.error(resolveApiErrorMessage({ code, msg }))
     }
   }
   catch (error) {

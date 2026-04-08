@@ -6,6 +6,7 @@ import IconEditor from './IconEditor.vue'
 import { edit, getSiteFavicon } from '@/api/panel/itemIcon'
 import { getList as getGroupList } from '@/api/panel/itemIconGroup'
 import { t } from '@/locales'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 interface Props {
   visible: boolean
@@ -85,7 +86,7 @@ async function editApi() {
       emit('done', data)
     }
     else {
-      ms.error(`${t('common.saveFail')}:${msg}`)
+      ms.error(resolveApiErrorMessage({ code, msg }))
     }
   }
   catch (error) {
@@ -156,7 +157,7 @@ function getGroupListOptions() {
       }
     }
     else {
-      ms.error(`${t('iconItem.getGroupFail')}:${msg}`)
+      ms.error(resolveApiErrorMessage({ code, msg }))
     }
   })
 }

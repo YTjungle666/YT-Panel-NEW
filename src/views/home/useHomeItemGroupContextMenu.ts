@@ -4,6 +4,7 @@ import { PanelStateNetworkModeEnum } from '@/enums'
 import { VisitMode } from '@/enums/auth'
 import { t } from '@/locales'
 import { openUrlWithoutReferer } from '@/utils/cmn'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 import {
   type ItemGroup,
   type UseHomeItemGroupsOptions,
@@ -58,7 +59,7 @@ export function useHomeItemGroupContextMenu(options: UseHomeItemGroupContextMenu
               if (code === 0) {
                 handleDeleteSuccess(itemIconGroupId)
               } else {
-                message.error(`${t('common.deleteFail')}:${msg}`)
+                message.error(resolveApiErrorMessage({ code, msg }))
               }
             })
           },

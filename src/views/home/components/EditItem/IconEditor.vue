@@ -72,7 +72,6 @@ const handleUploadFinish = ({
   }
   else {
     apiRespErrMsg(res)
-    // ms.error(`${t('common.uploadFail')}:${res.msg}`)
   }
 
   return file

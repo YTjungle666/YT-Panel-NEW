@@ -12,6 +12,7 @@ import { addMultiple as addMultipleIcons, getListByGroupId } from '@/api/panel/i
 
 import { t } from '@/locales'
 import { logError } from '@/utils/logger'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 interface ItemGroup extends Panel.ItemIconGroup {
   items?: Panel.ItemInfo[]
@@ -80,7 +81,7 @@ async function importIcons(): Promise<string | null> {
               const response = await addMultipleIcons(addIcons)
 
               if (response.code !== 0)
-                return response.msg
+                return resolveApiErrorMessage(response)
 
               addIcons = []
             }
@@ -88,7 +89,7 @@ async function importIcons(): Promise<string | null> {
         }
       }
       else {
-        return createGroupResponse.msg
+        return resolveApiErrorMessage(createGroupResponse)
       }
     }
 

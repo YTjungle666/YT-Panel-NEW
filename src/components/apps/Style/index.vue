@@ -8,6 +8,7 @@ import { PanelPanelConfigStyleEnum } from '@/enums/panel'
 import { t } from '@/locales'
 import { ss } from '@/utils/storage'
 import { sanitizeFooterHtml } from '@/utils/sanitize'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 // 用户配置缓存键
 const USER_CONFIG_CACHE_KEY = 'USER_CONFIG_CACHE'
@@ -85,7 +86,7 @@ function uploadCloud() {
       ss.remove(USER_CONFIG_CACHE_KEY)
     }
     else {
-      ms.error(t('apps.baseSettings.configFailed', { message: res.msg }))
+      ms.error(t('apps.baseSettings.configFailed', { message: resolveApiErrorMessage(res) }))
     }
   })
 }
