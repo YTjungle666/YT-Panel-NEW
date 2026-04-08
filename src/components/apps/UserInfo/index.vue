@@ -12,6 +12,7 @@ import { t } from '@/locales'
 import { router } from '@/router'
 import { clearAppScopedStorage } from '@/store/modules/auth/helper'
 import { updateLocalUserInfo } from '@/utils/cmn'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 const userStore = useUserStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -48,14 +49,12 @@ const updatePasswordModalFormRules: FormRules = {
   password: {
     required: true,
     trigger: 'blur',
-    min: 8,
     max: 64,
     message: t('settingUserInfo.passwordLimit'),
   },
   confirmPassword: {
     required: true,
     trigger: 'blur',
-    min: 8,
     max: 64,
     message: t('settingUserInfo.passwordLimit'),
   },
@@ -128,7 +127,7 @@ function handleUpdatePassword(e: MouseEvent) {
         await resetClientSession(t('settingUserInfo.passwordUpdateSuccess'))
       }
       else {
-        ms.error(msg || t('common.failed'))
+        ms.error(resolveApiErrorMessage({ code, msg }))
       }
     }).finally(() => {
       updatePasswordModalState.value.loading = false

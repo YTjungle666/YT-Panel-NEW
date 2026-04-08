@@ -243,8 +243,16 @@ pub fn validate_register_username(username: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn validate_register_password(password: &str) -> Result<(), ApiError> {
-    if !(8..=64).contains(&password.len()) {
+fn validate_register_password(password: &str, allow_weak_password: bool) -> Result<(), ApiError> {
+    if password.is_empty() {
+        return Err(ApiError::bad_param("Password is required"));
+    }
+    if password.len() > 64 {
+        return Err(ApiError::bad_param(
+            "Password length must not exceed 64 characters",
+        ));
+    }
+    if !allow_weak_password && password.len() < 8 {
         return Err(ApiError::bad_param(
             "Password length must be between 8 and 64 characters",
         ));
@@ -319,8 +327,8 @@ pub async fn validate_password_by_policy(
     db: &SqlitePool,
     password: &str,
 ) -> Result<(), ApiError> {
-    validate_register_password(password)?;
     let policy = get_password_policy(db).await?;
+    validate_register_password(password, policy.allow_weak_password)?;
     if !policy.allow_weak_password && is_weak_password(password) {
         return Err(ApiError::bad_param(
             "Password is too weak. Use at least three character types: uppercase, lowercase, numbers, and symbols",

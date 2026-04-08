@@ -6,12 +6,15 @@
     "currentUseUsername": "Current username",
     "deletePromptContent": "Are you sure you want to delete {name} ({username})?",
     "formRules": {
-      "passwordLimit": "6-20 characters",
+      "passwordLimit": "Password must not exceed 20 characters",
       "roleRequired": "Please select a role",
       "usernameRequired": "Enter username with at least 5 characters"
     },
     "passwordPlaceholder": "Enter password",
     "role": "Role",
+    "status": "Status",
+    "statusActive": "Active",
+    "statusDisabled": "Disabled",
     "userCountText": "Total {count} users"
   },
   "api": {
@@ -19,17 +22,21 @@
   },
   "apiErrorCode": {
     "1000": "Not logged in",
+    "1001": "Login session has expired, please sign in again",
     "1003": "wrong user name or password",
     "1004": "Account has been deactivated or inactivated",
     "1005": "Currently no permission to operate",
     "1006": "Account does not exist",
     "1007": "Old password error",
+    "1108": "You must change the initial password before continuing",
     "1200": "database error",
     "1201": "Please keep at least one",
     "1202": "Data record not found",
     "1300": "Upload failed",
     "1301": "Upload failed, unsupported file format",
     "1400": "Parameter format error",
+    "1401": "Username or email already exists",
+    "1500": "Internal server error",
     "1503": "Password reset email is not configured for this instance yet. Please contact the administrator."
   },
   "appLauncher": {
@@ -340,7 +347,7 @@
     "newPassword": "New password",
     "oldPassword": "Old password",
     "updatePassword": "Change password",
-    "passwordLimit": "Password length must be between 8 and 64 characters",
+    "passwordLimit": "Password must not exceed 64 characters",
     "forceChangePasswordNotice": "This account is still using the initial password. Please change it to a strong password before continuing.",
     "passwordUpdatedRelogin": "Password updated successfully. Please log in again."
   }

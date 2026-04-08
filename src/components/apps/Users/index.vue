@@ -65,6 +65,16 @@ const createColumns = ({
       },
     },
     {
+      title: t('adminSettingUsers.status'),
+      key: 'status',
+      render(row) {
+        if (row.status === 1)
+          return h(NTag, { type: 'success' }, t('adminSettingUsers.statusActive'))
+
+        return h(NTag, { type: 'warning' }, t('adminSettingUsers.statusDisabled'))
+      },
+    },
+    {
       title: t('common.action'),
       key: '',
       render(row) {

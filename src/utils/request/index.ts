@@ -1,6 +1,6 @@
 import type { AxiosProgressEvent, AxiosResponse, GenericAbortSignal } from 'axios'
 import request from './axios'
-import { apiRespErrMsg, message } from './apiMessage'
+import { apiRespErrMsg, message, resolveApiErrorMessage } from './apiMessage'
 import { t } from '@/locales'
 import { useAppStore, useAuthStore } from '@/store'
 import { router } from '@/router'
@@ -54,12 +54,12 @@ function http<T = any>(
     }
 
     if (res.data.code === 1005) {
-      message.warning(res.data.msg)
+      message.warning(resolveApiErrorMessage(res.data))
       return res.data
     }
 
     if (res.data.code === 1108) {
-      message.warning(res.data.msg)
+      message.warning(resolveApiErrorMessage(res.data))
       return res.data
     }
 

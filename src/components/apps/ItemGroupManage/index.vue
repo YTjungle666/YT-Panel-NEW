@@ -6,6 +6,7 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { deletes, edit, getList, saveSort } from '@/api/panel/itemIconGroup'
 import { RoundCardModal, SvgIcon } from '@/components/common'
 import { t } from '@/locales'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 import { ss } from '@/utils/storage/local'
 
 function clearGroupCaches() {
@@ -86,7 +87,7 @@ function handleSaveSort() {
       sortStatus.value = false
     }
     else {
-      ms.error(`${t('common.saveFail')}:${msg}`)
+      ms.error(`${t('common.saveFail')}:${resolveApiErrorMessage({ code, msg })}`)
     }
   })
 }
@@ -119,7 +120,7 @@ function handleSaveGroup() {
     if (!errors) {
       edit(editModalArg.value.model).then(({ code, msg }) => {
         if (code !== 0) {
-          ms.error(msg)
+          ms.error(resolveApiErrorMessage({ code, msg }))
           return
         }
 

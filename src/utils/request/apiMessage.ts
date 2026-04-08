@@ -11,6 +11,15 @@ const configProviderPropsRef = computed<ConfigProviderProps>(() => ({
 }))
 export const { message, dialog } = createDiscreteApi(['message', 'dialog'], { configProviderProps: configProviderPropsRef })
 
+export function resolveApiErrorMessage(res: Pick<Response, 'code' | 'msg'>): string {
+  const apiErrorCodeName = `apiErrorCode.${res.code}`
+  const translated = t(apiErrorCodeName)
+  if (translated !== apiErrorCodeName)
+    return translated
+
+  return res.msg || t('common.failed')
+}
+
 export function apiRespErrMsg(res: Response): boolean {
   const appStore = useAppStore()
   const osTheme = useOsTheme()
@@ -20,12 +29,12 @@ export function apiRespErrMsg(res: Response): boolean {
     themeRef.value = appStore.theme as 'dark' | 'light'
 
   const apiErrorCodeName = `apiErrorCode.${res.code}`
-  const getI18nValue = t(apiErrorCodeName)
-  if (apiErrorCodeName === getI18nValue) {
+  const localized = t(apiErrorCodeName)
+  if (localized === apiErrorCodeName) {
     return false
   }
   else {
-    message.error(t(`apiErrorCode.${res.code}`))
+    message.error(resolveApiErrorMessage(res))
     return true
   }
 }

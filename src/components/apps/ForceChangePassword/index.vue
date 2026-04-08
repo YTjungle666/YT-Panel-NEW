@@ -8,6 +8,7 @@ import { useAppStore, useAuthStore, usePanelState, useUserStore } from '@/store'
 import { clearAppScopedStorage } from '@/store/modules/auth/helper'
 import { t } from '@/locales'
 import { router } from '@/router'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -35,14 +36,12 @@ const formRules: FormRules = {
   password: {
     required: true,
     trigger: 'blur',
-    min: 8,
     max: 64,
     message: t('settingUserInfo.passwordLimit'),
   },
   confirmPassword: {
     required: true,
     trigger: 'blur',
-    min: 8,
     max: 64,
     message: t('settingUserInfo.passwordLimit'),
   },
@@ -90,7 +89,7 @@ function handleUpdatePassword(e: MouseEvent) {
     updatePassword(formState.value.form.oldPassword, formState.value.form.password)
       .then(async ({ code, msg }) => {
         if (code !== 0) {
-          ms.error(msg || t('common.failed'))
+          ms.error(resolveApiErrorMessage({ code, msg }))
           return
         }
 

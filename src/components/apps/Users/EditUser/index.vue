@@ -5,6 +5,7 @@ import { NButton, NForm, NFormItem, NInput, NSelect, useMessage } from 'naive-ui
 import { edit as userManageEdit } from '@/api/panel/users'
 import { RoundCardModal } from '@/components/common'
 import { t } from '@/locales'
+import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 interface Props {
   visible: boolean
@@ -25,7 +26,7 @@ const formInitValue = {
   name: '',
   username: '',
   role: 2,
-  status: 3,
+  status: 1,
 }
 
 const model = ref<User.Info>(formInitValue)
@@ -39,6 +40,17 @@ const roleOtions = ref([
   {
     label: t('common.role.admin'),
     value: 1,
+  },
+])
+
+const statusOptions = ref([
+  {
+    label: t('adminSettingUsers.statusActive'),
+    value: 1,
+  },
+  {
+    label: t('adminSettingUsers.statusDisabled'),
+    value: 0,
   },
 ])
 
@@ -59,7 +71,6 @@ const rules: FormRules = {
   },
   password: {
     trigger: 'blur',
-    min: 6,
     max: 20,
     message: t('adminSettingUsers.formRules.passwordLimit'),
   },
@@ -73,12 +84,11 @@ const show = computed({
   },
 })
 
-watch(show, (newValue, oldValue) => {
+watch(show, () => {
   if (props.userInfo?.id)
-    model.value = props.userInfo || {}
-
+    model.value = { ...formInitValue, ...props.userInfo, status: props.userInfo.status === 1 ? 1 : 0 }
   else
-    model.value = formInitValue
+    model.value = { ...formInitValue }
 })
 
 const add = async () => {
@@ -87,7 +97,7 @@ const add = async () => {
     emit('done', res.data.id as number)
 
   else if (res.code !== -1)
-    message.warning(t('common.failed'))
+    message.warning(resolveApiErrorMessage(res))
 }
 
 const handleValidateButtonClick = (e: MouseEvent) => {
@@ -114,6 +124,13 @@ const handleValidateButtonClick = (e: MouseEvent) => {
         <NSelect
           v-model:value="model.role"
           :options="roleOtions"
+        />
+      </NFormItem>
+
+      <NFormItem path="status" :label="$t('adminSettingUsers.status')">
+        <NSelect
+          v-model:value="model.status"
+          :options="statusOptions"
         />
       </NFormItem>
 
