@@ -9,6 +9,7 @@ import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 
 interface Props {
   visible: boolean
+  allowWeakPassword?: boolean
   userId?: number
   userInfo?: User.Info
 }
@@ -136,7 +137,7 @@ const handleValidateButtonClick = (e: MouseEvent) => {
 
       <NFormItem path="password" :label="$t('common.password')">
         <NInput v-model:value="model.password" :maxlength="20" type="password" :placeholder="`${userInfo?.id ? $t('adminSettingUsers.EditpasswordPlaceholder') : $t('adminSettingUsers.passwordPlaceholder')}`" />
-        <div class="mt-1 text-xs text-slate-500">
+        <div v-if="!allowWeakPassword" class="mt-1 text-xs text-slate-500">
           {{ $t('adminSettingUsers.formRules.passwordRuleHint') }}
         </div>
       </NFormItem>

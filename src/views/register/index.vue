@@ -36,7 +36,7 @@
               <SvgIcon icon="lock" class="w-4 h-4 text-slate-500" />
             </template>
           </NInput>
-          <div class="mt-1 text-xs text-slate-400">
+          <div v-if="showStrongPasswordHint" class="mt-1 text-xs text-slate-400">
             {{ $t('settingUserInfo.passwordRuleHint') }}
           </div>
         </NFormItem>
@@ -92,10 +92,12 @@ import { SvgIcon } from '@/components/common'
 import type { FormInst } from 'naive-ui'
 import { logError } from '@/utils/logger'
 import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
+import { usePublicPasswordPolicy } from '@/hooks/usePublicPasswordPolicy'
 
 const formRef = ref<FormInst | null>(null)
 const message = useMessage()
 const loading = ref(false)
+const { showStrongPasswordHint } = usePublicPasswordPolicy()
 
 const form = ref<{
   username: string

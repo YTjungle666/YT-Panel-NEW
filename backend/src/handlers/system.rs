@@ -266,9 +266,17 @@ pub async fn openness_login_config(State(state): State<AppState>) -> ApiResult {
     let value = serde_json::from_str::<Value>(&raw)
         .unwrap_or_else(|_| default_system_application_value());
     let register = parse_register_config(value.get("register"));
+    let allow_weak_password = get_setting(&state.db, "security_password_policy")
+        .await?
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .and_then(|value| value.get("allowWeakPassword").and_then(|item| item.as_bool()))
+        .unwrap_or(false);
     Ok(ok(json!({
         "loginCaptcha": value.get("loginCaptcha").and_then(|v| v.as_bool()).unwrap_or(false),
         "register": register,
+        "passwordPolicy": {
+            "allowWeakPassword": allow_weak_password,
+        }
     })))
 }
 

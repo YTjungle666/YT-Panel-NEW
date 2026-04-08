@@ -284,6 +284,6 @@ onMounted(() => {
 
       @update:page="handlePageChange"
     />
-    <EditUser v-model:visible="editUserDialogShow" :user-info="editUserUserInfo" @done="handelDone" />
+    <EditUser v-model:visible="editUserDialogShow" :user-info="editUserUserInfo" :allow-weak-password="allowWeakPassword" @done="handelDone" />
   </div>
 </template>

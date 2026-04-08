@@ -7,7 +7,7 @@
     "deletePromptContent": "你确定删除{name}({username})？",
     "formRules": {
       "passwordLimit": "密码长度不能超过 20 个字符",
-      "passwordRuleHint": "关闭弱密码后，新密码至少 8 位，且至少包含大写字母、小写字母、数字、符号中的 3 类",
+      "passwordRuleHint": "请输入强密码且不少于8位",
       "roleRequired": "请选择角色",
       "usernameRequired": "请输入账号且大于5个字符"
     },
@@ -371,7 +371,7 @@
     "oldPassword": "旧密码",
     "updatePassword": "修改密码",
     "passwordLimit": "密码长度不能超过 64 个字符",
-    "passwordRuleHint": "关闭弱密码后，新密码必须为 8 到 64 位，且至少包含大写字母、小写字母、数字、符号中的 3 类",
+    "passwordRuleHint": "请输入强密码且不少于8位",
     "forceChangePasswordNotice": "当前账号仍在使用初始密码，请先修改为强密码后再继续使用。",
     "passwordUpdatedRelogin": "密码修改成功，请重新登录"
   }

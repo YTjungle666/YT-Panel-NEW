@@ -10,6 +10,7 @@ import { t } from '@/locales'
 import { router } from '@/router'
 import { resolveApiErrorMessage } from '@/utils/request/apiMessage'
 import { suppressLoginExpiredNotice } from '@/utils/request'
+import { usePublicPasswordPolicy } from '@/hooks/usePublicPasswordPolicy'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -18,6 +19,7 @@ const panelState = usePanelState()
 const ms = useMessage()
 const dialog = useDialog()
 const formRef = ref<FormInst | null>(null)
+const { showStrongPasswordHint } = usePublicPasswordPolicy()
 
 const formState = ref({
   loading: false,
@@ -133,7 +135,7 @@ function handleLogout() {
 
         <NFormItem path="password" :label="$t('settingUserInfo.newPassword')">
           <NInput v-model:value="formState.form.password" :maxlength="64" type="password" :placeholder="$t('settingUserInfo.newPassword')" />
-          <div class="mt-1 text-xs text-slate-500">
+          <div v-if="showStrongPasswordHint" class="mt-1 text-xs text-slate-500">
             {{ $t('settingUserInfo.passwordRuleHint') }}
           </div>
         </NFormItem>
