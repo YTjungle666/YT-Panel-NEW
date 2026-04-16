@@ -8,4 +8,4 @@ if command -v udhcpc >/dev/null 2>&1; then
   udhcpc -q -n -i eth0 >/dev/null 2>&1 || true
 fi
 
-exec /app/yt-panel
+exec /usr/local/bin/container-init

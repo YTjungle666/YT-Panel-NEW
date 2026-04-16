@@ -21,6 +21,7 @@ COPY LICENSE /app/LICENSE
 COPY backend/config/docker.toml /app/conf/app.toml
 COPY dist /app/web
 COPY backend/target/x86_64-unknown-linux-musl/release/yt-panel-rust-backend /app/yt-panel
+COPY --chmod=755 scripts/container-init.sh /usr/local/bin/container-init
 
 RUN chmod 0755 /app/yt-panel \
     && chown -R ytpanel:ytpanel /app/database /app/uploads \
@@ -34,7 +35,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 
 USER ytpanel:ytpanel
 
-CMD ["/app/yt-panel"]
+CMD ["/usr/local/bin/container-init"]
 
 FROM runtime AS ct-template
 USER root
