@@ -19,3 +19,4 @@ backend/target/x86_64-unknown-linux-musl/release/**
 !scripts
 scripts/**
 !scripts/ct-entrypoint.sh
+!scripts/container-init.sh
