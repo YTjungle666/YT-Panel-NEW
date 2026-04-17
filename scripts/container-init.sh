@@ -2,7 +2,7 @@
 set -u
 
 if [ "$#" -eq 0 ]; then
-  set -- /app/yt-panel
+  set -- /app/yt-panel-bin
 fi
 
 child_pid=''

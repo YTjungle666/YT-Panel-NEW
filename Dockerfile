@@ -20,13 +20,14 @@ ENV YT_PANEL_CONFIG=/app/conf/app.toml
 COPY LICENSE /app/LICENSE
 COPY backend/config/docker.toml /app/conf/app.toml
 COPY dist /app/web
-COPY backend/target/x86_64-unknown-linux-musl/release/yt-panel-rust-backend /app/yt-panel
-COPY --chmod=755 scripts/container-init.sh /usr/local/bin/container-init
+COPY backend/target/x86_64-unknown-linux-musl/release/yt-panel-rust-backend /app/yt-panel-bin
+COPY --chmod=755 scripts/container-init.sh /app/yt-panel
 
-RUN chmod 0755 /app/yt-panel \
+RUN ln -s /app/yt-panel /usr/local/bin/container-init \
+    && chmod 0755 /app/yt-panel /app/yt-panel-bin \
     && chown -R ytpanel:ytpanel /app/database /app/uploads \
-    && chown ytpanel:ytpanel /app/yt-panel /app/LICENSE \
-    && setcap cap_net_bind_service=+ep /app/yt-panel
+    && chown ytpanel:ytpanel /app/yt-panel /app/yt-panel-bin /app/LICENSE \
+    && setcap cap_net_bind_service=+ep /app/yt-panel-bin
 
 EXPOSE 80
 
